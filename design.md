@@ -54,3 +54,4 @@ https://github.com/gildas-lormeau/single-file-cli -- 需要docker
 提出如下能提高软件易用性的建议：
 
 - 可以配置自定义域名，通过修改 DNS 实现？
+- URL前添加 offline/ 快捷保存

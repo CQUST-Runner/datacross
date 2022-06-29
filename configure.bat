@@ -1,5 +1,5 @@
 @REM nodejs npm angular
-@REM go
+@REM go mingw
 
 cd frontend
 npm install
