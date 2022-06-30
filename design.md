@@ -129,7 +129,46 @@ sqlite 数据：
 - 给每个保存的网页添加顶层快捷按钮，可直接修改、删除等，也可跳转至配置页
 
 ### 保存方案调研
-https://github.com/gildas-lormeau/single-file-cli -- 需要docker
+
+https://github.com/puppeteer/puppeteer
+- *.html + *_files 形式?
+- 不会下载全部资源, 有些资源依然是url
+
+https://github.com/gildas-lormeau/SingleFile
+- 浏览器插件, 支持大多数浏览器
+- 单页面保存
+- 支持保存选定内容、选定frame
+- 批量保存
+- 注解、修改保存的网页
+- 可保存至Google Drive，GitHub
+- [已知问题列表](https://github.com/gildas-lormeau/SingleFile#known-issues)，看了下都是可接受的小问题
+- 仍在维护，使用的项目也比较多
+
+https://github.com/gildas-lormeau/single-file-cli
+- SingleFile的命令行版本
+- 单页面保存
+- 需要docker, 或许能够可以脱离运行
+- 脱离运行需要nodejs, 以及 Chrome 或 Firefox 或者jsdom
+- 还在维护
+
+https://github.com/zTrix/webpage2html
+- 需要python
+- 单页面保存
+- 直接保存有无权限问题
+- 先用浏览器保存, 再压缩成单文件的问题是: 浏览器不会下载某些资源
+- 不支持less
+- 不支持srcset
+- [SATA协议](https://github.com/zTrix/webpage2html/blob/master/LICENSE.txt)
+- 很久没维护了
+
+https://github.com/markusmobius/nodeSavePageWE
+- 依赖nodejs
+- 单页面保存
+- 从 Chrome SavePageWE 扩展改造, 可靠性不错
+- 存在问题, 尚不确知
+- 很久没维护了
+
+综合对比，直接保存或借助浏览器保存，https://github.com/gildas-lormeau/single-file-cli都是最优选择
 
 ## 易用性
 
@@ -141,3 +180,15 @@ https://github.com/gildas-lormeau/single-file-cli -- 需要docker
     - 自定义协议跳转到 offliner 然后跳转到浏览器过于繁琐，而且自定义协议的链接一般无法被识别为链接
     - 最好直接拷贝 a 标签，实际链接为 localhost:port/abc 形式
 - URL前添加 offline/ 快捷保存
+- 支持批量保存
+
+## 相似项目
+
+- https://github.com/ArchiveBox/ArchiveBox
+    - 没有多端同步支持
+    - 没有浏览器插件保存授权内容
+    - 过于复杂
+
+- https://github.com/pjamar/htmls-to-datasette
+    - 功能比较单一
+  
