@@ -1,0 +1,23 @@
+{
+	"name": "single-file",
+	"version": "1.0.10",
+	"description": "SingleFile",
+	"author": "Gildas Lormeau",
+	"license": "AGPL-3.0-or-later",
+	"scripts": {
+		"dev": "npx rollup -c rollup.config.dev.js",
+		"build": "./build-extension.sh"
+	},
+	"bin": {
+		"single-file": "./cli/single-file"
+	},
+	"dependencies": {
+		"single-file-core": "1.0.17",
+		"single-file-cli": "1.0.12"
+	},
+	"devDependencies": {
+		"@rollup/plugin-node-resolve": "13.3.0",
+		"rollup": "2.75.5",
+		"rollup-plugin-terser": "7.0.2"
+	}
+}
