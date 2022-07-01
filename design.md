@@ -182,6 +182,10 @@ https://github.com/markusmobius/nodeSavePageWE
 - URL前添加 offline/ 快捷保存
 - 支持批量保存
 
+## 可靠性
+
+保持几份数据文件备份
+
 ## 相似项目
 
 - https://github.com/ArchiveBox/ArchiveBox
