@@ -40,6 +40,7 @@ func (f *MmapFile) Init(filename string) (err error) {
 		}
 	}()
 
+	// high and low can be 0
 	obj, err := syscall.CreateFileMapping(h, nil, syscall.PAGE_READWRITE, 0, 1024, nil)
 	if err != nil {
 		return err

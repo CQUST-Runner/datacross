@@ -181,6 +181,7 @@ https://github.com/markusmobius/nodeSavePageWE
     - 最好直接拷贝 a 标签，实际链接为 localhost:port/abc 形式
 - URL前添加 offline/ 快捷保存
 - 支持批量保存
+- 以后阅读和提醒支持
 
 ## 可靠性
 
