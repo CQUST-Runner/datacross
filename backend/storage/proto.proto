@@ -1,2 +1,21 @@
 syntax = "proto3";
 
+option go_package = "storage";
+
+message FileHeader {
+    string id = 1;
+}
+
+enum Op {
+    None = 0;
+    Add = 1;
+    Del = 2;
+    Modify = 3;
+    Accept = 4;
+}
+
+message LogEntry {
+    int32 op = 1;
+    string key = 2;
+    string value = 3;
+}

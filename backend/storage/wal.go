@@ -4,28 +4,19 @@ import (
 	"io"
 )
 
-const (
-	Add    = 0x1
-	Modify = 0x2
-	Del    = 0x3
-	Accept = 0x4
-)
-
 const HeaderSize = 0x100
-
-type FileHeader struct {
-	Id string
-}
-
-// LogEntry
-type LogEntry struct {
-	Op    uint8
-	Key   string
-	Value string
-}
 
 type LogFile struct {
 	f File
+}
+
+func writeHeader(f File, header *FileHeader) error {
+
+	_, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func readHeader(f File) error {
@@ -42,6 +33,7 @@ func readHeader(f File) error {
 	if fSize < HeaderSize {
 		newHeader := FileHeader{Id: id}
 		_ = newHeader
+
 	}
 
 	_, err = f.Seek(0, io.SeekStart)
