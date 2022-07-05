@@ -7,3 +7,5 @@ npm install
 cd ..
 cd third-party/single-file-cli
 npm install
+
+go install github.com/gogo/protobuf/protoc-gen-gofast@latest

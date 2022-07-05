@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-sqlite3 v1.14.14 // indirect
