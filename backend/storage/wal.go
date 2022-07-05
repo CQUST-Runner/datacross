@@ -15,15 +15,15 @@ type LogEntry struct {
 }
 
 type LogFile struct {
-	fd uintptr
+	f File
 }
 
 func (f *LogFile) Init(filename string) error {
-	fd, err := OpenFile(filename)
+	ff, err := OpenFile(filename)
 	if err != nil {
 		return err
 	}
-	f.fd = fd
+	f.f = ff
 	return nil
 }
 
