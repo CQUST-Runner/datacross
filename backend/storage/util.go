@@ -2,6 +2,13 @@
 
 package storage
 
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"strings"
+)
+
 // func OpenFile(filename string) (uintptr, error) {
 // 	ptr, err := syscall.UTF16PtrFromString(filename)
 // 	if err != nil {
@@ -28,3 +35,27 @@ package storage
 // func FlushBuffer(fd uintptr) error {
 // 	return syscall.FlushFileBuffers(syscall.Handle(fd))
 // }
+
+func GenUUID() (string, error) {
+	data := [16]byte{}
+	n, err := rand.Read(data[:])
+	if err != nil {
+		return "", err
+	}
+	if n != len(data) {
+		return "", fmt.Errorf("generate random numbers failed")
+	}
+
+	sb := strings.Builder{}
+	sb.Grow(36)
+	sb.WriteString(hex.EncodeToString(data[:4]))
+	sb.WriteByte('-')
+	sb.WriteString(hex.EncodeToString(data[4:6]))
+	sb.WriteByte('-')
+	sb.WriteString(hex.EncodeToString(data[6:8]))
+	sb.WriteByte('-')
+	sb.WriteString(hex.EncodeToString(data[8:10]))
+	sb.WriteByte('-')
+	sb.WriteString(hex.EncodeToString(data[10:]))
+	return sb.String(), nil
+}

@@ -1,5 +1,10 @@
 package storage
 
+import (
+	"fmt"
+	"testing"
+)
+
 // func TestOpenFile(t *testing.T) {
 // 	fd, err := OpenFile("test.txt")
 // 	assert.Nil(t, err)
@@ -20,3 +25,7 @@ package storage
 // 	assert.Nil(t, err)
 // 	fmt.Println(n)
 // }
+
+func TestGenUUID(t *testing.T) {
+	fmt.Println(GenUUID())
+}
