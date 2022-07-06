@@ -1,37 +1,88 @@
 package storage
 
 import (
+	"database/sql"
+	"time"
+
 	"gorm.io/driver/sqlite" // Sqlite driver based on GGO
+
 	// "github.com/glebarez/sqlite" // Pure go SQLite driver, checkout https://github.com/glebarez/sqlite for details
-	"fmt"
 
 	"gorm.io/gorm"
 )
 
+type DBRecord struct {
+	Key       string `gorm:"primarykey"`
+	MachineID string
+	Value     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt sql.NullTime `gorm:"index"`
+}
+
 // SqliteAdapter ...
 type SqliteAdapter struct {
+	db        *gorm.DB
+	tableName string
+	table     *gorm.DB
+}
+
+func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	s.table = db.Table(tableName)
+	s.tableName = tableName
+	s.db = db
+	return nil
+}
+
+func (s *SqliteAdapter) Close() error {
+	return nil
 }
 
 func (s *SqliteAdapter) Save(key string, value string) error {
-	return nil
+	if has, err := s.Has(key); has || err != nil {
+		return s.table.Save(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+	} else {
+		return s.table.Create(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+	}
 }
 
 func (s *SqliteAdapter) Del(key string) error {
-	return nil
+	return s.table.Delete(&DBRecord{Key: key}).Error
 }
 
 func (s *SqliteAdapter) Has(key string) (bool, error) {
-	return false, nil
+	recs := []DBRecord{}
+	result := s.table.Find(&recs, "key = ?", key)
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
 }
 
 func (s *SqliteAdapter) Load(key string) (string, error) {
-	return "", fmt.Errorf("not exist")
+	rec := DBRecord{}
+	result := s.table.First(&rec, "key = ?", key)
+	if result.Error != nil {
+		return "", result.Error
+	}
+	return rec.Value, nil
 }
 
-func foo() {
-
-	// github.com/mattn/go-sqlite3
-	db, err := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
-	_ = db
-	_ = err
+func (s *SqliteAdapter) All() ([][]string, error) {
+	records := []DBRecord{}
+	result := s.table.Find(&records)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	kvs := [][]string{}
+	for _, rec := range records {
+		kvs = append(kvs, []string{rec.Key, rec.Value})
+	}
+	return kvs, nil
 }
