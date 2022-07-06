@@ -15,6 +15,7 @@ type DBRecord struct {
 	Key       string `gorm:"primarykey"`
 	MachineID string
 	Value     string
+	IsMain    bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt sql.NullTime `gorm:"index"`
