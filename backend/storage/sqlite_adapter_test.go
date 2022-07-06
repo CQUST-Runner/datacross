@@ -1,31 +1,46 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func getDB(t assert.TestingT) *SqliteAdapter {
-	const fileName = "test.db"
-	const tableName = "test"
-	err := os.Remove(fileName)
-	assert.Nil(t, err)
+const fileName = "test.db"
+const tableName = "test"
 
+func getDB(t assert.TestingT) *SqliteAdapter {
+	_, err := os.Stat(fileName)
+	if err == nil {
+		err := os.Remove(fileName)
+		assert.Nil(t, err)
+	}
 	a := SqliteAdapter{}
 	err = a.Init(fileName, tableName)
 	assert.Nil(t, err)
 	return &a
 }
 
+func delDB() {
+	err := os.Remove(fileName)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
 func TestInit(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 	_ = a
 }
 
 func TestSave(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 
 	const key = "test1"
 	const valuePrefix = "testVal"
@@ -38,7 +53,9 @@ func TestSave(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 
 	const key = "test1"
 	const valuePrefix = "testVal"
@@ -59,7 +76,9 @@ func TestLoad(t *testing.T) {
 }
 
 func TestHas(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 
 	const key = "test1"
 	const valuePrefix = "testVal"
@@ -77,7 +96,9 @@ func TestHas(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 
 	const key = "test1"
 	const valuePrefix = "testVal"
@@ -98,7 +119,9 @@ func TestDel(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
+	t.Cleanup(delDB)
 	a := getDB(t)
+	defer a.Close()
 
 	const key1 = "test1"
 	const key2 = "test2"

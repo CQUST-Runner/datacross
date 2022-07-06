@@ -47,6 +47,11 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 }
 
 func (s *SqliteAdapter) Close() error {
+	db, err := s.db.DB()
+	if err != nil {
+		return err
+	}
+	db.Close()
 	return nil
 }
 
