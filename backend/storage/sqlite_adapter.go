@@ -86,15 +86,19 @@ func (s *SqliteAdapter) Load(key string) (string, error) {
 	return rec.Value, nil
 }
 
-func (s *SqliteAdapter) All() ([][]string, error) {
+func (s *SqliteAdapter) All() ([][2]string, error) {
 	records := []DBRecord{}
 	result := s.table.Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	kvs := [][]string{}
+	kvs := [][2]string{}
 	for _, rec := range records {
-		kvs = append(kvs, []string{rec.Key, rec.Value})
+		kvs = append(kvs, [2]string{rec.Key, rec.Value})
 	}
 	return kvs, nil
+}
+
+func _() {
+	var _ Storage = &SqliteAdapter{}
 }

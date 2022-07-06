@@ -8,6 +8,7 @@ type Storage interface {
 	Del(key string) error
 	Has(key string) (bool, error)
 	Load(key string) (val string, err error)
+	All() ([][2]string, error)
 }
 
 // HybridStorage ...
@@ -28,4 +29,12 @@ func (s *HybridStorage) Has(key string) (bool, error) {
 
 func (s *HybridStorage) Load(key string) (string, error) {
 	return "", fmt.Errorf("not exist")
+}
+
+func (s *HybridStorage) All() ([][2]string, error) {
+	return nil, nil
+}
+
+func _() {
+	var _ Storage = &HybridStorage{}
 }

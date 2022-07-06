@@ -21,3 +21,11 @@ func (s *MapWithWal) Has(key string) (bool, error) {
 func (s *MapWithWal) Load(key string) (string, error) {
 	return "", fmt.Errorf("not exist")
 }
+
+func (s *MapWithWal) All() ([][2]string, error) {
+	return nil, nil
+}
+
+func _() {
+	var _ Storage = &MapWithWal{}
+}
