@@ -34,7 +34,13 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 		return err
 	}
 
-	s.table = db.Table(tableName)
+	err = db.AutoMigrate(&DBRecord{})
+	if err != nil {
+		return err
+	}
+
+	// s.table = db.Table(tableName)
+	s.table = db
 	s.tableName = tableName
 	s.db = db
 	return nil
