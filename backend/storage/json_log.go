@@ -15,11 +15,11 @@ func (l *JsonLog) ReadHeader(f File) (*FileHeader, error) {
 	return nil, nil
 }
 
-func (l *JsonLog) AppendEntry(f File, pos uint, entry *LogEntry) error {
+func (l *JsonLog) AppendEntry(f File, pos int64, entry *LogEntry) error {
 	return nil
 }
 
-func (l *JsonLog) ReadEntry(f File, pos int64, entry *LogEntry) (uint32, error) {
+func (l *JsonLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 	return 0, nil
 }
 
