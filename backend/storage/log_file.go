@@ -1,5 +1,7 @@
 package storage
 
+const HeaderSize = 0x100
+
 type LogFile interface {
 	WriteHeader(f File, header *FileHeader) error
 	IsValidFile(f File) (bool, error)
