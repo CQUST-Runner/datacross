@@ -18,8 +18,13 @@ func (l *BinLog) WriteHeader(f File, header *FileHeader) error {
 		return err
 	}
 
+	if header.Size() > HeaderSize-4 {
+		return fmt.Errorf("file header too large")
+	}
+
 	headBuffer := [HeaderSize]byte{}
-	n, err := header.MarshalToSizedBuffer(headBuffer[:])
+	binary.LittleEndian.PutUint32(headBuffer[:4], uint32(header.Size()))
+	n, err := header.MarshalToSizedBuffer(headBuffer[4 : 4+header.Size()])
 	if err != nil {
 		return err
 	}
@@ -69,8 +74,16 @@ func (l *BinLog) ReadHeader(f File) (*FileHeader, error) {
 		return nil, fmt.Errorf("read size not expected")
 	}
 
+	headerDataSize := binary.LittleEndian.Uint32(headerBuffer[:4])
+	if headerDataSize == 0 {
+		return &FileHeader{}, nil
+	}
+	if int(headerDataSize) > len(headerBuffer)-4 {
+		return nil, fmt.Errorf("invalid file")
+	}
+
 	header := FileHeader{}
-	err = header.Unmarshal(headerBuffer[:])
+	err = header.Unmarshal(headerBuffer[4 : 4+headerDataSize])
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +125,13 @@ func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) error {
 		return fmt.Errorf("log entry too large")
 	}
 	entryBuffer := make([]byte, writeSize, writeSize)
-	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : len(entryBuffer)-4])
+	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : 4+entry.Size()])
 	if err != nil {
 		return err
 	}
 	binary.LittleEndian.PutUint32(entryBuffer[0:4], uint32(sz))
 	crcSum := crc32.ChecksumIEEE(entryBuffer[4 : len(entryBuffer)-4])
-	binary.LittleEndian.PutUint32(entryBuffer[len(entryBuffer)-4-1:], crcSum)
+	binary.LittleEndian.PutUint32(entryBuffer[len(entryBuffer)-4:], crcSum)
 
 	writeSz, err := f.Write(entryBuffer)
 	if err != nil {
