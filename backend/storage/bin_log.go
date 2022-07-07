@@ -91,43 +91,43 @@ func (l *BinLog) ReadHeader(f File) (*FileHeader, error) {
 }
 
 // 写失败将破坏文件数据
-func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) error {
+func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 	valid, err := l.IsValidFile(f)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if !valid {
-		return fmt.Errorf("invalid file")
+		return 0, fmt.Errorf("invalid file")
 	}
 
 	sz := entry.Size()
 	if sz == 0 {
-		return nil
+		return 0, nil
 	}
 
 	if pos != -1 {
 		if pos < HeaderSize {
-			return fmt.Errorf("invalid pos")
+			return 0, fmt.Errorf("invalid pos")
 		}
 		_, err := f.Seek(pos, io.SeekStart)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	} else {
 		_, err := f.Seek(0, io.SeekEnd)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
 	writeSize := sz + 8
 	if writeSize > math.MaxUint32 {
-		return fmt.Errorf("log entry too large")
+		return 0, fmt.Errorf("log entry too large")
 	}
 	entryBuffer := make([]byte, writeSize, writeSize)
 	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : 4+entry.Size()])
 	if err != nil {
-		return err
+		return 0, err
 	}
 	binary.LittleEndian.PutUint32(entryBuffer[0:4], uint32(sz))
 	crcSum := crc32.ChecksumIEEE(entryBuffer[4 : len(entryBuffer)-4])
@@ -135,12 +135,12 @@ func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) error {
 
 	writeSz, err := f.Write(entryBuffer)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if writeSz != len(entryBuffer) {
-		return fmt.Errorf("write size not expected")
+		return 0, fmt.Errorf("write size not expected")
 	}
-	return nil
+	return int64(writeSz), nil
 }
 
 func (l *BinLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {

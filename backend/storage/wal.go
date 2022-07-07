@@ -1,11 +1,17 @@
 package storage
 
-// TODO: 添加log库
+import (
+	"fmt"
+
+	gogoproto "github.com/gogo/protobuf/proto"
+)
 
 type Wal struct {
 	f      File
 	l      LogFile
 	header *FileHeader
+	pos    int64
+	broken bool
 }
 
 func (w *Wal) Init(filename string, l LogFile) error {
@@ -39,16 +45,101 @@ func (w *Wal) Init(filename string, l LogFile) error {
 	w.header = header
 	w.f = f
 	w.l = l
+	w.pos = header.FileEnd
+	w.broken = false
+	return nil
+}
+
+func (w *Wal) Close() error {
+	if w.f == nil {
+		return nil
+	}
+	err := w.f.Close()
+	if err != nil {
+		logger.Error("close wal file[%v] failed[%v]", w.f.Path(), err)
+		return err
+	}
+	w.f = nil
+	w.header = nil
+	w.broken = false
+	w.l = nil
+	w.pos = 0
 	return nil
 }
 
 func (w *Wal) Append(entry *LogEntry) error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+
+	writeSz, err := w.l.AppendEntry(w.f, w.pos, entry)
+	if err != nil {
+		return err
+	}
+	if writeSz == 0 {
+		return nil
+	}
+
+	newPos := w.pos + writeSz
+	newHeader := gogoproto.Clone(w.header).(*FileHeader)
+	newHeader.FileEnd = newPos
+	err = w.l.WriteHeader(w.f, newHeader)
+	// This should not be happen
+	if err != nil {
+		w.broken = true
+		return err
+	}
+
+	w.pos = newPos
+	w.header = newHeader
 	return nil
 }
 
-func (w *Wal) Replay(s Storage) {
+func execLogEntry(entry *LogEntry, s Storage) error {
+	switch entry.Op {
+	case int32(Op_Add):
+		return s.Save(entry.Key, entry.Value)
+	case int32(Op_Del):
+		return s.Del(entry.Key)
+	case int32(Op_Modify):
+		return s.Save(entry.Key, entry.Value)
+	case int32(Op_Accept):
+		return fmt.Errorf("unsupported op[%v]", entry.Op)
+	case int32(Op_None):
+		return fmt.Errorf("unrecognized op[%v]", entry.Op)
+	default:
+		return fmt.Errorf("unrecognized op[%v]", entry.Op)
+	}
+}
+
+func (w *Wal) Replay(s Storage) error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+
+	var pos int64 = HeaderSize
+	for pos < w.header.FileEnd {
+		entry := LogEntry{}
+		readSz, err := w.l.ReadEntry(w.f, pos, &entry)
+		if err != nil {
+			return err
+		}
+		if readSz <= 0 {
+			return fmt.Errorf("read size unexpected")
+		}
+		err = execLogEntry(&entry, s)
+		if err != nil {
+			return err
+		}
+		pos += readSz
+	}
+	return nil
 }
 
 func (w *Wal) Flush() error {
-	return nil
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+
+	return w.f.Flush()
 }

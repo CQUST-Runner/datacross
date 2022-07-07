@@ -9,7 +9,8 @@ import (
 )
 
 type winFile struct {
-	handle syscall.Handle
+	handle   syscall.Handle
+	filename string
 }
 
 func (f *winFile) Close() error {
@@ -58,6 +59,10 @@ func (f *winFile) Flush() error {
 	return syscall.FlushFileBuffers(f.handle)
 }
 
+func (f *winFile) Path() string {
+	return f.filename
+}
+
 func OpenFile(filename string) (File, error) {
 	ptr, err := syscall.UTF16PtrFromString(filename)
 	if err != nil {
@@ -74,5 +79,5 @@ func OpenFile(filename string) (File, error) {
 		_ = syscall.CloseHandle(h)
 		return nil, err
 	}
-	return &winFile{handle: h}, nil
+	return &winFile{handle: h, filename: filename}, nil
 }

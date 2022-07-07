@@ -46,6 +46,9 @@ func (a *builtinLoggerAdapter) Info(format string, args ...interface{}) {
 
 var logger Logger = newLogger(os.Stdout, "Core")
 
+// suppress warning
+var _ = logger
+
 func SetLogger(l Logger) {
 	logger = l
 }
