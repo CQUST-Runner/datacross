@@ -13,6 +13,7 @@ type JsonLog struct {
 
 // 写失败将破坏文件数据
 func (l *JsonLog) WriteHeader(f File, header *FileHeader) error {
+	const available = HeaderSize - 1
 	_, err := f.Seek(0, io.SeekStart)
 	if err != nil {
 		return err
@@ -22,15 +23,17 @@ func (l *JsonLog) WriteHeader(f File, header *FileHeader) error {
 	if err != nil {
 		return err
 	}
-	if len(jDoc) > HeaderSize {
+	if len(jDoc) > available {
 		return fmt.Errorf("header too large")
 	}
 
-	padding := HeaderSize - len(jDoc)
+	padding := available - len(jDoc)
 	if padding > 0 {
 		spaces := bytes.Repeat([]byte{' '}, padding)
 		jDoc = append(jDoc, spaces...)
 	}
+	// now its length equal to HeaderSize
+	jDoc = append(jDoc, '\n')
 
 	n, err := f.Write(jDoc)
 	if err != nil {
@@ -55,12 +58,13 @@ func (l *JsonLog) IsValidFile(f File) (bool, error) {
 }
 
 func (l *JsonLog) ReadHeader(f File) (*FileHeader, error) {
+	const available = HeaderSize - 1
 	_, err := f.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
 
-	buffer := [HeaderSize]byte{}
+	buffer := [available]byte{}
 	n, err := f.Read(buffer[:])
 	if err != nil {
 		return nil, err
