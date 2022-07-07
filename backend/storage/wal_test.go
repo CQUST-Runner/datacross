@@ -21,15 +21,26 @@ func delWalFile() {
 	}
 }
 
-func TestWalInit(t *testing.T) {
-	delWalFile()
-	t.Cleanup(delWalFile)
-
+func testWalInit(t assert.TestingT, l LogFile) {
 	wal := Wal{}
-	err := wal.Init(walFileName, &BinLog{})
+	err := wal.Init(walFileName, l)
 	assert.Nil(t, err)
 
 	defer wal.Close()
+}
+
+func TestWalInitWithBinLog(t *testing.T) {
+	delWalFile()
+	t.Cleanup(delWalFile)
+
+	testWalInit(t, &BinLog{})
+}
+
+func TestWalInitWithJsonLog(t *testing.T) {
+	delWalFile()
+	t.Cleanup(delWalFile)
+
+	testWalInit(t, &JsonLog{})
 }
 
 type mapWrapper struct {
@@ -75,12 +86,9 @@ func _() {
 	var _ Storage = &mapWrapper{}
 }
 
-func TestWalAppend(t *testing.T) {
-	delWalFile()
-	t.Cleanup(delWalFile)
-
+func testWalAppend(t assert.TestingT, l LogFile) {
 	wal := Wal{}
-	err := wal.Init(walFileName, &BinLog{})
+	err := wal.Init(walFileName, l)
 	assert.Nil(t, err)
 	defer wal.Close()
 
@@ -113,4 +121,18 @@ func TestWalAppend(t *testing.T) {
 	assert.Nil(t, err)
 	expected = map[string]string{testKey + "3": testValue + "4", testKey + "4": testValue + "4"}
 	assert.Equal(t, fmt.Sprint(expected), fmt.Sprint(m.m))
+}
+
+func TestWalAppendWithBinLog(t *testing.T) {
+	delWalFile()
+	t.Cleanup(delWalFile)
+
+	testWalAppend(t, &BinLog{})
+}
+
+func TestWalAppendWithJsonLog(t *testing.T) {
+	delWalFile()
+	t.Cleanup(delWalFile)
+
+	testWalAppend(t, &JsonLog{})
 }
