@@ -6,11 +6,11 @@ import (
 
 // MapWithWal ...
 type MapWithWal struct {
-	log *LogFile
+	log *Wal
 	m   map[string]string
 }
 
-func (s *MapWithWal) Init(log *LogFile) {
+func (s *MapWithWal) Init(log *Wal) {
 	s.log = log
 	s.m = map[string]string{}
 }
