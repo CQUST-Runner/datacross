@@ -85,9 +85,22 @@ func (l *JsonLog) AppendEntry(f File, pos int64, entry *LogEntry) (int64, error)
 	}
 	jDoc = append(jDoc, '\n')
 
-	_, err = f.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
+	if pos != -1 {
+		if pos < HeaderSize {
+			return 0, fmt.Errorf("invalid pos")
+		}
+		_, err = f.Seek(pos, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		sz, err := f.Seek(0, io.SeekEnd)
+		if err != nil {
+			return 0, err
+		}
+		if sz < HeaderSize {
+			return 0, fmt.Errorf("invalid file")
+		}
 	}
 
 	n, err := f.Write(jDoc)
@@ -105,6 +118,7 @@ func (l *JsonLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	reader := bufio.NewReader(f)
 	jDoc, err := reader.ReadBytes('\n')
 	if err != nil {

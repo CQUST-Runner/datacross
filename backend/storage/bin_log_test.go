@@ -29,13 +29,11 @@ func delFile() {
 	}
 }
 
-func TestHeader(t *testing.T) {
-	t.Cleanup(delFile)
+func testHeader(t assert.TestingT, l LogFile) {
 	f := getFile(t)
 	defer f.Close()
 	fileID := "test"
 
-	l := BinLog{}
 	valid, err := l.IsValidFile(f)
 	assert.Nil(t, err)
 	assert.False(t, valid)
@@ -54,13 +52,16 @@ func TestHeader(t *testing.T) {
 	assert.Equal(t, int64(HeaderSize), h.FileEnd)
 }
 
-func TestLogEntry(t *testing.T) {
+func TestHeader(t *testing.T) {
 	t.Cleanup(delFile)
+	testHeader(t, &BinLog{})
+}
+
+func testLogEntry(t assert.TestingT, l LogFile) {
 	f := getFile(t)
 	defer f.Close()
 	fileID := "test"
 
-	l := BinLog{}
 	valid, err := l.IsValidFile(f)
 	assert.Nil(t, err)
 	assert.False(t, valid)
@@ -100,4 +101,9 @@ func TestLogEntry(t *testing.T) {
 	assert.Equal(t, int32(Op_Modify), entry.Op)
 	assert.Equal(t, testKey+"2", entry.Key)
 	assert.Equal(t, testValue+"2", entry.Value)
+}
+
+func TestLogEntry(t *testing.T) {
+	t.Cleanup(delFile)
+	testLogEntry(t, &BinLog{})
 }
