@@ -76,15 +76,17 @@ func TestLogEntry(t *testing.T) {
 	testKey := "testKey"
 	testValue := "testValue"
 	entry := LogEntry{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"}
-	err = l.AppendEntry(f, -1, &entry)
+	n, err := l.AppendEntry(f, -1, &entry)
 	assert.Nil(t, err)
+	assert.Greater(t, n, int64(8))
 
 	entry = LogEntry{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"}
-	err = l.AppendEntry(f, -1, &entry)
+	n, err = l.AppendEntry(f, -1, &entry)
 	assert.Nil(t, err)
+	assert.Greater(t, n, int64(8))
 
 	entry = LogEntry{}
-	n, err := l.ReadEntry(f, HeaderSize, &entry)
+	n, err = l.ReadEntry(f, HeaderSize, &entry)
 	assert.Nil(t, err)
 	assert.Greater(t, n, int64(8))
 	assert.Equal(t, int32(Op_Modify), entry.Op)
