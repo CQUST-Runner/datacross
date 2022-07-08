@@ -67,12 +67,17 @@ func (w *Wal) Close() error {
 	return nil
 }
 
-func (w *Wal) Append(entry *LogEntry) error {
+func (w *Wal) Append(op int32, key string, value string) error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")
 	}
 
-	writeSz, err := w.l.AppendEntry(w.f, w.pos, entry)
+	gid, err := GenUUID()
+	if err != nil {
+		return err
+	}
+	entry := LogEntry{Op: op, Key: key, Value: value, Gid: gid}
+	writeSz, err := w.l.AppendEntry(w.f, w.pos, &entry)
 	if err != nil {
 		return err
 	}
@@ -112,11 +117,7 @@ func execLogEntry(entry *LogEntry, s Storage) error {
 	}
 }
 
-func (w *Wal) Replay(s Storage) error {
-	if w.broken {
-		return fmt.Errorf("wal is broken")
-	}
-
+func foreach(w *Wal, do func(entry *LogEntry) bool) error {
 	var pos int64 = HeaderSize
 	for pos < w.header.FileEnd {
 		entry := LogEntry{}
@@ -127,13 +128,46 @@ func (w *Wal) Replay(s Storage) error {
 		if readSz <= 0 {
 			return fmt.Errorf("read size unexpected")
 		}
-		err = execLogEntry(&entry, s)
-		if err != nil {
-			return err
+
+		if !do(&entry) {
+			break
 		}
 		pos += readSz
 	}
 	return nil
+}
+
+func replay(w *Wal, s Storage, start string, end string) error {
+	inRange := len(start) == 0
+	var e error
+	err := foreach(w, func(entry *LogEntry) bool {
+		if len(start) > 0 && entry.Gid == start {
+			inRange = true
+		}
+		if len(end) > 0 && entry.Gid == end && inRange {
+			inRange = false
+		}
+		if inRange {
+			err := execLogEntry(entry, s)
+			if err != nil {
+				e = err
+				return false
+			}
+		}
+		return true
+	})
+
+	if err != nil {
+		return err
+	}
+	return e
+}
+
+func (w *Wal) Replay(s Storage, start string) error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+	return replay(w, s, start, "")
 }
 
 func (w *Wal) Flush() error {

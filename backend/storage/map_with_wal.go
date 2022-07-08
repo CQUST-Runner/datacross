@@ -16,7 +16,7 @@ func (s *MapWithWal) Init(log *Wal) {
 }
 
 func (s *MapWithWal) Save(key string, value string) error {
-	err := s.log.Append(&LogEntry{Op: int32(Op_Modify), Key: key, Value: value})
+	err := s.log.Append(int32(Op_Modify), key, value)
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (s *MapWithWal) Save(key string, value string) error {
 }
 
 func (s *MapWithWal) Del(key string) error {
-	err := s.log.Append(&LogEntry{Op: int32(Op_Del), Key: key})
+	err := s.log.Append(int32(Op_Del), key, "")
 	if err != nil {
 		return err
 	}
