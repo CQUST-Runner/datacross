@@ -50,7 +50,9 @@ func (s *SqliteAdapter) LastCommit() (string, error) {
 }
 
 func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
-	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{
+		SkipDefaultTransaction: true,
+	})
 	if err != nil {
 		return err
 	}

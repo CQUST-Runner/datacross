@@ -175,7 +175,7 @@ func TestHybridStorageAll(t *testing.T) {
 	expected := [][2]string{{testKey + "1", testValue + "1"},
 		{testKey + "2", testValue + "2"},
 		{testKey + "3", testValue + "3"}}
-	assert.EqualValues(t, expected, records)
+	assert.ElementsMatch(t, expected, records)
 }
 
 func TestHybridStorageRecoverDB(t *testing.T) {
@@ -212,7 +212,7 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	assert.Nil(t, err)
 	expected := [][2]string{{testKey + "1", testValue + "1"},
 		{testKey + "3", testValue + "3"}}
-	assert.EqualValues(t, expected, records)
+	assert.ElementsMatch(t, expected, records)
 }
 
 func getFileSize(filename string) (int64, error) {
