@@ -23,7 +23,16 @@ func getDB(t assert.TestingT) *SqliteAdapter {
 	return &a
 }
 
-func delDB() {
+func getDBFile(t assert.TestingT) string {
+	_, err := os.Stat(fileName)
+	if err == nil {
+		err := os.Remove(fileName)
+		assert.Nil(t, err)
+	}
+	return fileName
+}
+
+func delDBFile() {
 	err := os.Remove(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -31,14 +40,14 @@ func delDB() {
 }
 
 func TestInit(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 	_ = a
 }
 
 func TestSave(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 
@@ -53,7 +62,7 @@ func TestSave(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 
@@ -76,7 +85,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestHas(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 
@@ -96,7 +105,7 @@ func TestHas(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 
@@ -119,7 +128,7 @@ func TestDel(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 
@@ -151,7 +160,7 @@ func TestAll(t *testing.T) {
 }
 
 func TestLastCommit(t *testing.T) {
-	t.Cleanup(delDB)
+	t.Cleanup(delDBFile)
 	a := getDB(t)
 	defer a.Close()
 

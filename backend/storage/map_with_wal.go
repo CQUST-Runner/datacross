@@ -16,6 +16,19 @@ func (s *MapWithWal) Init(log *Wal) {
 	s.m = map[string]string{}
 }
 
+func (s *MapWithWal) Close() error {
+	if s.log != nil {
+		err := s.log.Close()
+		if err != nil {
+			return err
+		}
+		s.log = nil
+	}
+	s.m = nil
+	s.commitID = nil
+	return nil
+}
+
 func (s *MapWithWal) WithCommitID(_ string) Storage {
 	return s
 }

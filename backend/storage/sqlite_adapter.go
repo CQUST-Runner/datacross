@@ -131,6 +131,9 @@ func (s *SqliteAdapter) All() ([][2]string, error) {
 	}
 	kvs := [][2]string{}
 	for _, rec := range records {
+		if rec.Key == _last_commit_key {
+			continue
+		}
 		kvs = append(kvs, [2]string{rec.Key, rec.Value})
 	}
 	return kvs, nil

@@ -47,7 +47,30 @@ func (s *HybridStorage) Init(dbFile string, logFile string, l LogFile) error {
 
 	s.m = m
 	s.sqlite = &sqlite
+
+	ok := s.keepUpWithLog()
+	if !ok {
+		logger.Warn("sqlite is lag behind from wal")
+	}
+
 	return nil
+}
+
+func (s *HybridStorage) Close() {
+	if s.m != nil {
+		err := s.m.Close()
+		if err != nil {
+			logger.Error("close map failed[%v]", err)
+		}
+		s.m = nil
+	}
+	if s.sqlite != nil {
+		err := s.sqlite.Close()
+		if err != nil {
+			logger.Error("close sqlite failed[%v]", err)
+		}
+		s.sqlite = nil
+	}
 }
 
 func (s *HybridStorage) WithCommitID(_ string) Storage {

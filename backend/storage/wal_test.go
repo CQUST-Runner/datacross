@@ -10,6 +10,11 @@ import (
 
 const walFileName = "test.wal"
 
+func getWalFile() string {
+	delWalFile()
+	return walFileName
+}
+
 func delWalFile() {
 	_, err := os.Stat(walFileName)
 	if err != nil {
