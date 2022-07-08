@@ -86,6 +86,10 @@ func (s *mapWrapper) All() ([][2]string, error) {
 	return records, nil
 }
 
+func (s *mapWrapper) Merge(Storage) error {
+	return fmt.Errorf("unsupported")
+}
+
 func _() {
 	var _ Storage = &mapWrapper{}
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/driver/sqlite" // Sqlite driver based on GGO
@@ -133,6 +134,10 @@ func (s *SqliteAdapter) All() ([][2]string, error) {
 		kvs = append(kvs, [2]string{rec.Key, rec.Value})
 	}
 	return kvs, nil
+}
+
+func (s *SqliteAdapter) Merge(Storage) error {
+	return fmt.Errorf("unsupported")
 }
 
 func _() {

@@ -76,6 +76,22 @@ func (s *MapWithWal) All() ([][2]string, error) {
 	return records, nil
 }
 
+func (s *MapWithWal) Merge(s2 Storage) error {
+	records, err := s2.All()
+	if err != nil {
+		return err
+	}
+
+	for _, tuple := range records {
+		key := tuple[0]
+		value := tuple[1]
+		if _, ok := s.m[key]; !ok {
+			s.m[key] = value
+		}
+	}
+	return nil
+}
+
 func _() {
 	var _ Storage = &MapWithWal{}
 }

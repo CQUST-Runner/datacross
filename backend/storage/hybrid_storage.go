@@ -1,5 +1,7 @@
 package storage
 
+import "fmt"
+
 // HybridStorage ...
 type HybridStorage struct {
 	m      *MapWithWal
@@ -125,6 +127,10 @@ func (s *HybridStorage) All() ([][2]string, error) {
 
 	// TODO: s.m.All覆盖records
 	return records, nil
+}
+
+func (s *HybridStorage) Merge(Storage) error {
+	return fmt.Errorf("unsupported")
 }
 
 func _() {
