@@ -72,8 +72,7 @@ func (s *SqliteAdapter) Close() error {
 	if err != nil {
 		return err
 	}
-	db.Close()
-	return nil
+	return db.Close()
 }
 
 func withCommitID(table *gorm.DB, commitID string, f func(tx *gorm.DB) error) error {

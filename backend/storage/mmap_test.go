@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 func TestMmap(t *testing.T) {
 	// dir := t.TempDir()
 	// filename := path.Join(dir, "test")
+	defer os.Remove("test.txt")
 	filename := "test.txt"
 
 	f := MmapFile{}

@@ -17,7 +17,12 @@ func (s *HybridStorage) keepUpWithLog() bool {
 		return false
 	}
 	if lastEntryID != lastCommit {
-		err = s.m.log.Replay(s.sqlite, lastCommit)
+		if len(lastCommit) == 0 {
+			// make it explicitly start from beginning
+			err = s.m.log.Replay(s.sqlite, "")
+		} else {
+			err = s.m.log.Replay(s.sqlite, lastCommit)
+		}
 		if err != nil {
 			return false
 		}

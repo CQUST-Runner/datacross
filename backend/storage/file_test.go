@@ -3,13 +3,14 @@ package storage
 import (
 	"fmt"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFile(t *testing.T) {
-
+	defer os.Remove("test.txt")
 	f, err := OpenFile("test.txt")
 	assert.Nil(t, err)
 	assert.NotNil(t, f)

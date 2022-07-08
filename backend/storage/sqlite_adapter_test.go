@@ -37,6 +37,16 @@ func delDBFile() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	journalFile := fileName + "-journal"
+	_, err = os.Stat(journalFile)
+	if err != nil {
+		return
+	}
+	err = os.Remove(journalFile)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestInit(t *testing.T) {
