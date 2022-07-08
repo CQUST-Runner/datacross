@@ -77,11 +77,11 @@ func (s *SqliteAdapter) Close() error {
 
 func withCommitID(table *gorm.DB, commitID string, f func(tx *gorm.DB) error) error {
 	return table.Transaction(func(tx *gorm.DB) error {
-		err := f(table)
+		err := f(tx)
 		if err != nil {
 			return err
 		}
-		return table.Save(&DBRecord{Key: _last_commit_key, Value: commitID}).Error
+		return tx.Save(&DBRecord{Key: _last_commit_key, Value: commitID}).Error
 	})
 }
 
