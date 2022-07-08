@@ -120,13 +120,11 @@ func (s *HybridStorage) Load(key string) (string, error) {
 }
 
 func (s *HybridStorage) All() ([][2]string, error) {
-	records, err := s.sqlite.All()
+	err := s.m.Merge(s.sqlite)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: s.m.All覆盖records
-	return records, nil
+	return s.m.All()
 }
 
 func (s *HybridStorage) Merge(Storage) error {
