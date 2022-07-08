@@ -5,6 +5,7 @@ option go_package = "storage";
 message FileHeader {
     string id = 1;
     int64 file_end = 2;
+    string last_entry_id = 3;
 }
 
 enum Op {

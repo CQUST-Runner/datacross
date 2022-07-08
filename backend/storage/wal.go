@@ -67,47 +67,48 @@ func (w *Wal) Close() error {
 	return nil
 }
 
-func (w *Wal) Append(op int32, key string, value string) error {
+func (w *Wal) Append(op int32, key string, value string) (string, error) {
 	if w.broken {
-		return fmt.Errorf("wal is broken")
+		return "", fmt.Errorf("wal is broken")
 	}
 
 	gid, err := GenUUID()
 	if err != nil {
-		return err
+		return "", err
 	}
 	entry := LogEntry{Op: op, Key: key, Value: value, Gid: gid}
 	writeSz, err := w.l.AppendEntry(w.f, w.pos, &entry)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if writeSz == 0 {
-		return nil
+		return "", fmt.Errorf("write size is 0, suspicious")
 	}
 
 	newPos := w.pos + writeSz
 	newHeader := gogoproto.Clone(w.header).(*FileHeader)
 	newHeader.FileEnd = newPos
+	newHeader.LastEntryId = gid
 	err = w.l.WriteHeader(w.f, newHeader)
 	// This should not be happen
 	if err != nil {
 		w.broken = true
-		return err
+		return "", err
 	}
 
 	w.pos = newPos
 	w.header = newHeader
-	return nil
+	return gid, nil
 }
 
 func execLogEntry(entry *LogEntry, s Storage) error {
 	switch entry.Op {
 	case int32(Op_Add):
-		return s.Save(entry.Key, entry.Value)
+		return s.WithCommitID(entry.Gid).Save(entry.Key, entry.Value)
 	case int32(Op_Del):
-		return s.Del(entry.Key)
+		return s.WithCommitID(entry.Gid).Del(entry.Key)
 	case int32(Op_Modify):
-		return s.Save(entry.Key, entry.Value)
+		return s.WithCommitID(entry.Gid).Save(entry.Key, entry.Value)
 	case int32(Op_Accept):
 		return fmt.Errorf("unsupported op[%v]", entry.Op)
 	case int32(Op_None):
@@ -138,11 +139,16 @@ func foreach(w *Wal, do func(entry *LogEntry) bool) error {
 }
 
 func replay(w *Wal, s Storage, start string, end string) error {
+	preInRange := false
 	inRange := len(start) == 0
 	var e error
 	err := foreach(w, func(entry *LogEntry) bool {
 		if len(start) > 0 && entry.Gid == start {
+			preInRange = true
+		}
+		if preInRange {
 			inRange = true
+			preInRange = false
 		}
 		if len(end) > 0 && entry.Gid == end && inRange {
 			inRange = false
@@ -163,6 +169,7 @@ func replay(w *Wal, s Storage, start string, end string) error {
 	return e
 }
 
+// Replay start not included
 func (w *Wal) Replay(s Storage, start string) error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")

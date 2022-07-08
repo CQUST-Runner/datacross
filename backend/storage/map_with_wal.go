@@ -6,8 +6,9 @@ import (
 
 // MapWithWal ...
 type MapWithWal struct {
-	log *Wal
-	m   map[string]string
+	log      *Wal
+	m        map[string]string
+	commitID *string
 }
 
 func (s *MapWithWal) Init(log *Wal) {
@@ -15,21 +16,41 @@ func (s *MapWithWal) Init(log *Wal) {
 	s.m = map[string]string{}
 }
 
+func (s *MapWithWal) WithCommitID(_ string) Storage {
+	return s
+}
+
+func (s *MapWithWal) Retrieve(commitID *string) *MapWithWal {
+	return &MapWithWal{log: s.log, m: s.m, commitID: commitID}
+}
+
+func (s *MapWithWal) setCommitID(id string) {
+	if s.commitID != nil {
+		*s.commitID = id
+	}
+}
+
+func (s *MapWithWal) LastEntryID() string {
+	return s.log.header.LastEntryId
+}
+
 func (s *MapWithWal) Save(key string, value string) error {
-	err := s.log.Append(int32(Op_Modify), key, value)
+	id, err := s.log.Append(int32(Op_Modify), key, value)
 	if err != nil {
 		return err
 	}
 	s.m[key] = value
+	s.setCommitID(id)
 	return nil
 }
 
 func (s *MapWithWal) Del(key string) error {
-	err := s.log.Append(int32(Op_Del), key, "")
+	id, err := s.log.Append(int32(Op_Del), key, "")
 	if err != nil {
 		return err
 	}
 	delete(s.m, key)
+	s.setCommitID(id)
 	return nil
 }
 

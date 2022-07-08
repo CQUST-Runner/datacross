@@ -51,6 +51,10 @@ func newMapWrapper() *mapWrapper {
 	return &mapWrapper{m: make(map[string]string)}
 }
 
+func (s *mapWrapper) WithCommitID(_ string) Storage {
+	return s
+}
+
 func (s *mapWrapper) Save(key string, value string) error {
 	s.m[key] = value
 	return nil
@@ -94,15 +98,15 @@ func testWalAppend(t assert.TestingT, l LogFile) {
 
 	const testKey = "testKey"
 	const testValue = "testValue"
-	err = wal.Append(int32(Op_Add), testKey+"1", testValue+"1")
+	_, err = wal.Append(int32(Op_Add), testKey+"1", testValue+"1")
 	assert.Nil(t, err)
-	err = wal.Append(int32(Op_Add), testKey+"2", testValue+"2")
+	_, err = wal.Append(int32(Op_Add), testKey+"2", testValue+"2")
 	assert.Nil(t, err)
-	err = wal.Append(int32(Op_Add), testKey+"3", testValue+"3")
+	_, err = wal.Append(int32(Op_Add), testKey+"3", testValue+"3")
 	assert.Nil(t, err)
-	err = wal.Append(int32(Op_Modify), testKey+"3", testValue+"4")
+	_, err = wal.Append(int32(Op_Modify), testKey+"3", testValue+"4")
 	assert.Nil(t, err)
-	err = wal.Append(int32(Op_Del), testKey+"2", "")
+	_, err = wal.Append(int32(Op_Del), testKey+"2", "")
 	assert.Nil(t, err)
 
 	m := newMapWrapper()
@@ -111,9 +115,9 @@ func testWalAppend(t assert.TestingT, l LogFile) {
 	expected := map[string]string{testKey + "1": testValue + "1", testKey + "3": testValue + "4"}
 	assert.Equal(t, fmt.Sprint(expected), fmt.Sprint(m.m))
 
-	err = wal.Append(int32(Op_Add), testKey+"4", testValue+"4")
+	_, err = wal.Append(int32(Op_Add), testKey+"4", testValue+"4")
 	assert.Nil(t, err)
-	err = wal.Append(int32(Op_Del), testKey+"1", "")
+	_, err = wal.Append(int32(Op_Del), testKey+"1", "")
 	assert.Nil(t, err)
 
 	m = newMapWrapper()

@@ -149,3 +149,13 @@ func TestAll(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, valuePrefix+"2", m[key2])
 }
+
+func TestLastCommit(t *testing.T) {
+	t.Cleanup(delDB)
+	a := getDB(t)
+	defer a.Close()
+
+	id, err := a.LastCommit()
+	assert.Nil(t, err)
+	assert.Equal(t, "", id)
+}

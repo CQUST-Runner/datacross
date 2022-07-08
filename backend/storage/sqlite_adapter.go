@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"gorm.io/driver/sqlite" // Sqlite driver based on GGO
@@ -26,6 +27,25 @@ type SqliteAdapter struct {
 	db        *gorm.DB
 	tableName string
 	table     *gorm.DB
+
+	commitID string
+}
+
+const _last_commit_key = "_last_commit"
+
+func (s *SqliteAdapter) WithCommitID(id string) Storage {
+	return &SqliteAdapter{db: s.db, tableName: s.tableName, table: s.table, commitID: id}
+}
+
+func (s *SqliteAdapter) LastCommit() (string, error) {
+	id, err := s.Load(_last_commit_key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return id, nil
 }
 
 func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
@@ -55,16 +75,32 @@ func (s *SqliteAdapter) Close() error {
 	return nil
 }
 
+func withCommitID(table *gorm.DB, commitID string, f func(tx *gorm.DB) error) error {
+	return table.Transaction(func(tx *gorm.DB) error {
+		err := f(table)
+		if err != nil {
+			return err
+		}
+		return table.Save(&DBRecord{Key: _last_commit_key, Value: commitID}).Error
+	})
+}
+
 func (s *SqliteAdapter) Save(key string, value string) error {
 	if has, err := s.Has(key); has || err != nil {
-		return s.table.Save(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+		return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
+			return s.table.Save(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+		})
 	} else {
-		return s.table.Create(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+		return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
+			return s.table.Create(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+		})
 	}
 }
 
 func (s *SqliteAdapter) Del(key string) error {
-	return s.table.Delete(&DBRecord{Key: key}).Error
+	return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
+		return s.table.Delete(&DBRecord{Key: key}).Error
+	})
 }
 
 func (s *SqliteAdapter) Has(key string) (bool, error) {
