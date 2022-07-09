@@ -163,7 +163,7 @@ func exec(w io.Writer, cmd string) {
 	case "help":
 		help(w, tokens[1:]...)
 	default:
-		fmt.Println("unknown command, type `help` for usage", tokens[0])
+		fmt.Printf("unknown command `%v`, type `help` for usage\n", tokens[0])
 	}
 }
 

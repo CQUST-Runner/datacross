@@ -28,7 +28,7 @@ func delWalFile() {
 
 func testWalInit(t assert.TestingT, l LogFormat) {
 	wal := Wal{}
-	err := wal.Init(walFileName, l)
+	err := wal.Init(walFileName, l, false)
 	assert.Nil(t, err)
 
 	defer wal.Close()
@@ -105,7 +105,7 @@ func _() {
 
 func testWalAppend(t assert.TestingT, l LogFormat) {
 	wal := Wal{}
-	err := wal.Init(walFileName, l)
+	err := wal.Init(walFileName, l, false)
 	assert.Nil(t, err)
 	defer wal.Close()
 

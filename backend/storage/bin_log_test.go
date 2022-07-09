@@ -17,7 +17,7 @@ func getFile(t assert.TestingT) File {
 		assert.Nil(t, err)
 	}
 
-	f, err := OpenFile(_fileName)
+	f, err := OpenFile(_fileName, false)
 	assert.Nil(t, err)
 	return f
 }

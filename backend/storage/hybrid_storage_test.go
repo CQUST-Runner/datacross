@@ -12,7 +12,7 @@ import (
 
 func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridStorage, error) {
 	wal := Wal{}
-	err := wal.Init(logFile, l)
+	err := wal.Init(logFile, l, false)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	walFile := getWalFile()
 
 	w := Wal{}
-	err := w.Init(walFile, &JsonLog{})
+	err := w.Init(walFile, &JsonLog{}, false)
 	assert.Nil(t, err)
 	const testKey = "testKey"
 	const testValue = "testValue"

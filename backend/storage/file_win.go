@@ -63,12 +63,21 @@ func (f *winFile) Path() string {
 	return f.filename
 }
 
-func OpenFile(filename string) (File, error) {
+func OpenFile(filename string, readonly bool) (File, error) {
 	ptr, err := syscall.UTF16PtrFromString(filename)
 	if err != nil {
 		return nil, err
 	}
-	h, err := syscall.CreateFile(ptr, syscall.GENERIC_READ|syscall.GENERIC_WRITE, 0, nil, syscall.OPEN_ALWAYS,
+	var access uint32 = syscall.GENERIC_READ
+	if !readonly {
+		access |= syscall.GENERIC_WRITE
+	}
+	// https://stackoverflow.com/a/11855880
+	var mode uint32 = syscall.FILE_SHARE_READ
+	if readonly {
+		mode |= syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE
+	}
+	h, err := syscall.CreateFile(ptr, access, mode, nil, syscall.OPEN_ALWAYS,
 		/*FILE_FLAG_SEQUENTIAL_SCAN*/
 		0x08000000, 0)
 	if err != nil {

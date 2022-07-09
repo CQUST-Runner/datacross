@@ -70,7 +70,7 @@ func condenseParticipantLog(wd string, name string, lastSyncPos string) (string,
 	}
 
 	w := Wal{}
-	err := w.Init(walFile, &BinLog{})
+	err := w.Init(walFile, &BinLog{}, true)
 	if err != nil {
 		return "", nil, err
 	}
@@ -171,7 +171,7 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	}
 
 	wal := Wal{}
-	err = wal.Init(walFile, &BinLog{})
+	err = wal.Init(walFile, &BinLog{}, false)
 	if err != nil {
 		return err
 	}

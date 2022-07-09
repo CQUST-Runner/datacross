@@ -11,7 +11,7 @@ import (
 
 func TestFile(t *testing.T) {
 	defer os.Remove("test.txt")
-	f, err := OpenFile("test.txt")
+	f, err := OpenFile("test.txt", false)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 	defer f.Close()

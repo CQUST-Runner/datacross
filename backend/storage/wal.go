@@ -12,10 +12,12 @@ type Wal struct {
 	header *FileHeader
 	pos    int64
 	broken bool
+
+	readonly bool
 }
 
-func (w *Wal) Init(filename string, l LogFormat) error {
-	f, err := OpenFile(filename)
+func (w *Wal) Init(filename string, l LogFormat, readonly bool) error {
+	f, err := OpenFile(filename, readonly)
 	if err != nil {
 		return err
 	}
@@ -26,6 +28,9 @@ func (w *Wal) Init(filename string, l LogFormat) error {
 	}
 	var header *FileHeader
 	if !valid {
+		if readonly {
+			return fmt.Errorf("invalid wal file")
+		}
 		id, err := GenUUID()
 		if err != nil {
 			return err
@@ -47,6 +52,7 @@ func (w *Wal) Init(filename string, l LogFormat) error {
 	w.l = l
 	w.pos = header.FileEnd
 	w.broken = false
+	w.readonly = readonly
 	return nil
 }
 
@@ -70,6 +76,9 @@ func (w *Wal) Close() error {
 func (w *Wal) Append(op int32, key string, value string) (string, error) {
 	if w.broken {
 		return "", fmt.Errorf("wal is broken")
+	}
+	if w.readonly {
+		return "", fmt.Errorf("append to readonly file")
 	}
 
 	gid, err := GenUUID()
@@ -180,6 +189,9 @@ func (w *Wal) Replay(s Storage, start string) error {
 func (w *Wal) Flush() error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")
+	}
+	if w.readonly {
+		return nil
 	}
 
 	return w.f.Flush()
