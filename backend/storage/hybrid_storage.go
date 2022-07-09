@@ -37,7 +37,7 @@ func (s *HybridStorage) keepUpWithLog() bool {
 	return lastCommit == lastEntryID
 }
 
-func (s *HybridStorage) Init(dbFile string, logFile string, l LogFile) error {
+func (s *HybridStorage) Init(dbFile string, logFile string, l LogFormat) error {
 	wal := Wal{}
 	err := wal.Init(logFile, l)
 	if err != nil {

@@ -26,7 +26,7 @@ func delWalFile() {
 	}
 }
 
-func testWalInit(t assert.TestingT, l LogFile) {
+func testWalInit(t assert.TestingT, l LogFormat) {
 	wal := Wal{}
 	err := wal.Init(walFileName, l)
 	assert.Nil(t, err)
@@ -103,7 +103,7 @@ func _() {
 	var _ Storage = &mapWrapper{}
 }
 
-func testWalAppend(t assert.TestingT, l LogFile) {
+func testWalAppend(t assert.TestingT, l LogFormat) {
 	wal := Wal{}
 	err := wal.Init(walFileName, l)
 	assert.Nil(t, err)

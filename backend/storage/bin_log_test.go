@@ -29,7 +29,7 @@ func delFile() {
 	}
 }
 
-func testHeader(t assert.TestingT, l LogFile) {
+func testHeader(t assert.TestingT, l LogFormat) {
 	f := getFile(t)
 	defer f.Close()
 	fileID := "test"
@@ -57,7 +57,7 @@ func TestHeader(t *testing.T) {
 	testHeader(t, &BinLog{})
 }
 
-func testLogEntry(t assert.TestingT, l LogFile) {
+func testLogEntry(t assert.TestingT, l LogFormat) {
 	f := getFile(t)
 	defer f.Close()
 	fileID := "test"

@@ -2,7 +2,7 @@ package storage
 
 const HeaderSize = 0x100
 
-type LogFile interface {
+type LogFormat interface {
 	WriteHeader(f File, header *FileHeader) error
 	IsValidFile(f File) (bool, error)
 	ReadHeader(f File) (*FileHeader, error)

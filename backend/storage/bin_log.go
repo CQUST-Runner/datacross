@@ -195,5 +195,5 @@ func (l *BinLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 }
 
 func _() {
-	var _ LogFile = &BinLog{}
+	var _ LogFormat = &BinLog{}
 }

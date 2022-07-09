@@ -143,5 +143,5 @@ func (l *JsonLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 }
 
 func _() {
-	var _ LogFile = &JsonLog{}
+	var _ LogFormat = &JsonLog{}
 }

@@ -8,13 +8,13 @@ import (
 
 type Wal struct {
 	f      File
-	l      LogFile
+	l      LogFormat
 	header *FileHeader
 	pos    int64
 	broken bool
 }
 
-func (w *Wal) Init(filename string, l LogFile) error {
+func (w *Wal) Init(filename string, l LogFormat) error {
 	f, err := OpenFile(filename)
 	if err != nil {
 		return err
