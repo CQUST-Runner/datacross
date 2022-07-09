@@ -24,13 +24,16 @@ func (s *HybridStorage) keepUpWithLog() bool {
 			err = s.m.log.Replay(s.sqlite, lastCommit)
 		}
 		if err != nil {
+			logger.Error("replay failed[%v]", err)
 			return false
 		}
 	}
 	lastCommit, err = s.sqlite.LastCommit()
 	if err != nil {
+		logger.Error("get last commit again failed[%v]", err)
 		return false
 	}
+	logger.Info("last entry id[%v], last commit[%v]", lastEntryID, lastCommit)
 	return lastCommit == lastEntryID
 }
 

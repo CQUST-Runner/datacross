@@ -122,7 +122,7 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string, machineID string) 
 
 	s.db = db
 	s.tableName = tableName
-	// s.workingDB = db.Table(tableName)
+	// s.workingDB = db.Model(&DBRecord{}).Table(tableName)
 	s.workingDB = db
 	s.commitID = ""
 	s.machineID = machineID
@@ -151,7 +151,15 @@ func withCommitID(workingDB *gorm.DB, machineID string, commitID string, f func(
 			return err
 		}
 		if len(commitID) > 0 && len(machineID) > 0 {
-			return tx.Save(&DBRecord{Key: _last_commit_key, MachineID: machineID, Value: commitID}).Error
+			rec := DBRecord{}
+			err := tx.Where("machine_id = ? AND key = ?", machineID, _last_commit_key).First(&rec).Error
+			if err == nil {
+				return tx.Where("machine_id = ? AND key = ?", machineID, _last_commit_key).Save(&DBRecord{Key: _last_commit_key, MachineID: machineID, Value: commitID}).Error
+			} else if errors.Is(err, gorm.ErrRecordNotFound) {
+				return tx.Create(&DBRecord{Key: _last_commit_key, MachineID: machineID, Value: commitID}).Error
+			} else {
+				return err
+			}
 		}
 		return nil
 	})
@@ -163,22 +171,22 @@ func (s *SqliteAdapter) Save(key string, value string) error {
 	}
 
 	if has, err := s.Has(key); has || err != nil {
-		return withCommitID(s.workingDB, s.commitID, s.machineID, func(tx *gorm.DB) error {
+		return withCommitID(s.workingDB, s.machineID, s.commitID, func(tx *gorm.DB) error {
 			return tx.Model(&DBRecord{}).Omit("machine_id").Where("machine_id = ? AND key = ?", s.machineID, key).Updates(&DBRecord{Key: key, Value: value}).Error
 		})
 	} else {
-		return withCommitID(s.workingDB, s.commitID, s.machineID, func(tx *gorm.DB) error {
-			return tx.Create(&DBRecord{Key: key, MachineID: s.machineID, Value: value}).Error
+		return withCommitID(s.workingDB, s.machineID, s.commitID, func(tx *gorm.DB) error {
+			return s.workingDB.Create(&DBRecord{Key: key, MachineID: s.machineID, Value: value}).Error
 		})
 	}
 }
 
 func (s *SqliteAdapter) Del(key string) error {
-	return withCommitID(s.workingDB, s.commitID, s.machineID, func(tx *gorm.DB) error {
+	return withCommitID(s.workingDB, s.machineID, s.commitID, func(tx *gorm.DB) error {
 		if len(s.machineID) == 0 {
-			return tx.Delete(&DBRecord{Key: key}).Error
+			return tx.Where("key = ?", key).Delete(&DBRecord{Key: key}).Error
 		} else {
-			return tx.Where("machine_id = ?", s.machineID).Delete(&DBRecord{Key: key}).Error
+			return tx.Where("machine_id = ? AND key = ?", s.machineID, key).Delete(&DBRecord{Key: key}).Error
 		}
 	})
 }

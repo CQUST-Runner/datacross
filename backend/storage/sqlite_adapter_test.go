@@ -294,4 +294,43 @@ func TestRollbackInnerTransaction(t *testing.T) {
 }
 
 func TestMachineID(t *testing.T) {
+	t.Cleanup(delDBFile)
+	a := getDB(t)
+	defer a.Close()
+
+	const testKey = "testKey"
+	const testValue = "testValue"
+	const machinePrefix = "machine"
+
+	err := a.WithMachineID(machinePrefix+"1").Save(testKey+"1", testValue+"1")
+	assert.Nil(t, err)
+	err = a.WithMachineID(machinePrefix+"2").Save(testKey+"2", testValue+"2")
+	assert.Nil(t, err)
+	err = a.WithMachineID(machinePrefix+"3").Save(testKey+"3", testValue+"3")
+	assert.Nil(t, err)
+
+	records, err := a.WithMachineID(machinePrefix + "1").All()
+	assert.Nil(t, err)
+	assert.Equal(t, int(1), len(records))
+	assert.Equal(t, [2]string{testKey + "1", testValue + "1"}, records[0])
+
+	records, err = a.WithMachineID(machinePrefix + "2").All()
+	assert.Nil(t, err)
+	assert.Equal(t, int(1), len(records))
+	assert.Equal(t, [2]string{testKey + "2", testValue + "2"}, records[0])
+
+	records, err = a.WithMachineID(machinePrefix + "3").All()
+	assert.Nil(t, err)
+	assert.Equal(t, int(1), len(records))
+	assert.Equal(t, [2]string{testKey + "3", testValue + "3"}, records[0])
+
+	err = a.WithMachineID(machinePrefix + "2").Del(testKey + "2")
+	assert.Nil(t, err)
+
+	records, err = a.WithMachineID("").All()
+	assert.Nil(t, err)
+	assert.Equal(t, int(2), len(records))
+	assert.ElementsMatch(t,
+		[][2]string{{testKey + "1", testValue + "1"}, {testKey + "3", testValue + "3"}},
+		records)
 }
