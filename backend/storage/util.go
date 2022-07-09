@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -58,4 +59,20 @@ func GenUUID() (string, error) {
 	sb.WriteByte('-')
 	sb.WriteString(hex.EncodeToString(data[10:]))
 	return sb.String(), nil
+}
+
+func IsFile(filename string) bool {
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return false
+	}
+	return stat.Mode().IsRegular()
+}
+
+func IsDir(filename string) bool {
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return false
+	}
+	return stat.Mode().IsDir()
 }
