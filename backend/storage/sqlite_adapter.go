@@ -24,6 +24,11 @@ type DBRecord struct {
 	DeletedAt sql.NullTime `gorm:"index"`
 }
 
+type SyncStatus struct {
+	Pos  map[string]string
+	Time time.Time
+}
+
 // SqliteAdapter ...
 type SqliteAdapter struct {
 	db        *gorm.DB
