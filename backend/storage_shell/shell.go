@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -73,7 +74,8 @@ func get(w io.Writer, args ...string) {
 	key := args[0]
 	val, err := p.S().Load(key)
 	if err != nil {
-		fmt.Fprintln(w, "set failed", err)
+		fmt.Fprintln(w, "get failed", err)
+		return
 	}
 	fmt.Fprintln(w, val)
 }
@@ -89,13 +91,45 @@ func set(w io.Writer, args ...string) {
 	err := p.S().Save(key, value)
 	if err != nil {
 		fmt.Fprintln(w, "set failed", err)
+		return
 	}
+}
+
+func del(w io.Writer, args ...string) {
+	if len(args) < 1 {
+		fmt.Fprintln(w, "too few args, usage: del <key>")
+		return
+	}
+
+	key := args[0]
+	err := p.S().Del(key)
+	if err != nil {
+		fmt.Fprintln(w, "del failed", err)
+		return
+	}
+}
+
+func has(w io.Writer, args ...string) {
+	if len(args) < 1 {
+		fmt.Fprintln(w, "too few args, usage: has <key>")
+		return
+	}
+
+	key := args[0]
+	has, err := p.S().Has(key)
+	if err != nil {
+		fmt.Fprintln(w, "has failed", err)
+		return
+	}
+	fmt.Println(has)
 }
 
 func help(w io.Writer, args ...string) {
 	fmt.Fprintln(w, `
 list
 get <key>
+del <key>
+has <key>
 set <key> <value>
 help
 exit
@@ -120,6 +154,10 @@ func exec(w io.Writer, cmd string) {
 		list(w, tokens[1:]...)
 	case "get":
 		get(w, tokens[1:]...)
+	case "del":
+		del(w, tokens[1:]...)
+	case "has":
+		has(w, tokens[1:]...)
 	case "set":
 		set(w, tokens[1:]...)
 	case "help":
@@ -130,13 +168,14 @@ func exec(w io.Writer, cmd string) {
 }
 
 func repl() {
+	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		cmd := ""
-		_, err := fmt.Scanln(&cmd)
-		if err != nil {
-			fmt.Println(err)
+		ok := scanner.Scan()
+		if !ok {
+			fmt.Println("read line error")
 			continue
 		}
+		cmd := scanner.Text()
 
 		if cmd == "exit" {
 			break
