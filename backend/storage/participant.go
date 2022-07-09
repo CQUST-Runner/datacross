@@ -158,6 +158,13 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	walFile := path.Join(personalPath, WalFileName)
 	dbFile := path.Join(personalPath, DBFileName)
 
+	if !IsDir(personalPath) {
+		err := os.MkdirAll(personalPath, 0777)
+		if err != nil {
+			return err
+		}
+	}
+
 	others, err := discoveryOtherParticipants(wd, name)
 	if err != nil {
 		return err
