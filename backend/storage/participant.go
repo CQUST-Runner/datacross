@@ -145,7 +145,7 @@ type Participant struct {
 // TODO background syncing, thread safety?
 // TODO set json flag to output single line json
 func (p *Participant) Init(wd string, name string) (err error) {
-	if !path.IsAbs(wd) {
+	if !path.IsAbs(wd) && !(len(wd) > 1 && wd[1] == ':') {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
@@ -274,9 +274,9 @@ func (p *Participant) trySync() {
 			var e error
 			switch entry.Op {
 			case int32(Op_Modify):
-				e = s2.WithMachineID(entry.Owner).WithCommitID("").Save(entry.Key, entry.Value)
+				e = s2.WithMachineID(p.name).WithCommitID("").Save(entry.Key, entry.Value)
 			case int32(Op_Del):
-				e = s2.WithMachineID(entry.Owner).WithCommitID("").Del(entry.Key)
+				e = s2.WithMachineID(p.name).WithCommitID("").Del(entry.Key)
 			}
 			if e != nil {
 				return err
