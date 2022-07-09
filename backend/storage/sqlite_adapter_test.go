@@ -179,3 +179,29 @@ func TestLastCommit(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "", id)
 }
+
+func TestLastSync(t *testing.T) {
+	t.Cleanup(delDBFile)
+	a := getDB(t)
+	defer a.Close()
+
+	status, err := a.LastSync()
+	assert.Nil(t, err)
+	assert.Equal(t, fmt.Sprint(map[string]string{}), fmt.Sprint(status.Pos))
+
+	newStatus := SyncStatus{Pos: map[string]string{"1": "2"}}
+	err = a.SaveLastSync(status, &newStatus)
+	assert.Nil(t, err)
+
+	status, err = a.LastSync()
+	assert.Nil(t, err)
+	assert.Equal(t, fmt.Sprint(newStatus.Pos), fmt.Sprint(status.Pos))
+
+	newStatus = SyncStatus{Pos: map[string]string{"3": "4"}}
+	err = a.SaveLastSync(status, &newStatus)
+	assert.Nil(t, err)
+
+	status, err = a.LastSync()
+	assert.Nil(t, err)
+	assert.Equal(t, fmt.Sprint(map[string]string{"1": "2", "3": "4"}), fmt.Sprint(status.Pos))
+}
