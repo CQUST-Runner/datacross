@@ -205,3 +205,93 @@ func TestLastSync(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, fmt.Sprint(map[string]string{"1": "2", "3": "4"}), fmt.Sprint(status.Pos))
 }
+
+func TestTransaction(t *testing.T) {
+	t.Cleanup(delDBFile)
+	a := getDB(t)
+	defer a.Close()
+
+	const testKey = "testKey"
+	const testValue = "testValue"
+
+	err := a.Transaction(func(s *SqliteAdapter) error {
+		err := s.Save(testKey+"1", testValue+"1")
+		assert.Nil(t, err)
+
+		_ = s.Transaction(func(s2 *SqliteAdapter) error {
+			err := s2.Save(testKey+"2", testValue+"2")
+			assert.Nil(t, err)
+			return fmt.Errorf("rollback")
+		})
+		return nil
+	})
+	assert.Nil(t, err)
+
+	has, err := a.Has(testKey + "1")
+	assert.Nil(t, err)
+	assert.True(t, has)
+	has, err = a.Has(testKey + "2")
+	assert.Nil(t, err)
+	assert.False(t, has)
+}
+
+func TestRollbackOuterTransaction(t *testing.T) {
+	t.Cleanup(delDBFile)
+	a := getDB(t)
+	defer a.Close()
+
+	const testKey = "testKey"
+	const testValue = "testValue"
+
+	err := a.Transaction(func(s *SqliteAdapter) error {
+		err := s.Save(testKey+"1", testValue+"1")
+		assert.Nil(t, err)
+
+		return s.Transaction(func(s2 *SqliteAdapter) error {
+			err := s2.Save(testKey+"2", testValue+"2")
+			assert.Nil(t, err)
+			return fmt.Errorf("rollback")
+		})
+	})
+	assert.NotNil(t, err)
+
+	has, err := a.Has(testKey + "1")
+	assert.Nil(t, err)
+	assert.False(t, has)
+	has, err = a.Has(testKey + "2")
+	assert.Nil(t, err)
+	assert.False(t, has)
+}
+
+func TestRollbackInnerTransaction(t *testing.T) {
+	t.Cleanup(delDBFile)
+	a := getDB(t)
+	defer a.Close()
+
+	const testKey = "testKey"
+	const testValue = "testValue"
+
+	err := a.Transaction(func(s *SqliteAdapter) error {
+		err := s.Transaction(func(s2 *SqliteAdapter) error {
+			err := s2.Save(testKey+"2", testValue+"2")
+			assert.Nil(t, err)
+			return nil
+		})
+		assert.Nil(t, err)
+
+		err = s.Save(testKey+"1", testValue+"1")
+		assert.Nil(t, err)
+		return fmt.Errorf("rollback")
+	})
+	assert.NotNil(t, err)
+
+	has, err := a.Has(testKey + "1")
+	assert.Nil(t, err)
+	assert.False(t, has)
+	has, err = a.Has(testKey + "2")
+	assert.Nil(t, err)
+	assert.False(t, has)
+}
+
+func TestMachineID(t *testing.T) {
+}

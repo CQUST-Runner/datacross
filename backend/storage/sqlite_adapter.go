@@ -189,7 +189,7 @@ func (s *SqliteAdapter) Has(key string) (bool, error) {
 	if len(s.machineID) == 0 {
 		result = s.workingDB.Find(&recs, "key = ?", key)
 	} else {
-		result = s.workingDB.Where("machine_id = ? AND key = ?").Find(&recs)
+		result = s.workingDB.Where("machine_id = ? AND key = ?", s.machineID, key).Find(&recs)
 	}
 	if result.Error != nil {
 		return false, result.Error
