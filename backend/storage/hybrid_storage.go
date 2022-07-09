@@ -37,25 +37,9 @@ func (s *HybridStorage) keepUpWithLog() bool {
 	return lastCommit == lastEntryID
 }
 
-func (s *HybridStorage) Init(dbFile string, logFile string, l LogFormat) error {
-	wal := Wal{}
-	err := wal.Init(logFile, l)
-	if err != nil {
-		return err
-	}
-
-	m := &MapWithWal{}
-	m.Init(&wal)
-
-	sqlite := SqliteAdapter{}
-	// TODO set machine id
-	err = sqlite.Init(dbFile, "test", "machine0")
-	if err != nil {
-		return err
-	}
-
+func (s *HybridStorage) Init(m *MapWithWal, sqlite *SqliteAdapter) error {
 	s.m = m
-	s.sqlite = &sqlite
+	s.sqlite = sqlite
 
 	ok := s.keepUpWithLog()
 	if !ok {

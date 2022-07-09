@@ -10,6 +10,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridStorage, error) {
+	wal := Wal{}
+	err := wal.Init(logFile, l)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &MapWithWal{}
+	m.Init(&wal)
+
+	sqlite := SqliteAdapter{}
+	// TODO set machine id
+	err = sqlite.Init(dbFile, "test", "machine0")
+	if err != nil {
+		return nil, err
+	}
+
+	s := HybridStorage{}
+	err = s.Init(m, &sqlite)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
 func TestHybridStorageInit(t *testing.T) {
 	t.Cleanup(delWalFile)
 	delWalFile()
@@ -17,8 +42,7 @@ func TestHybridStorageInit(t *testing.T) {
 	t.Cleanup(delDBFile)
 	delDBFile()
 
-	s := HybridStorage{}
-	err := s.Init(getDBFile(t), getWalFile(), &JsonLog{})
+	s, err := createHybridStorage(getDBFile(t), getWalFile(), &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 }
@@ -30,8 +54,7 @@ func TestHybridStorageSave(t *testing.T) {
 	t.Cleanup(delDBFile)
 	delDBFile()
 
-	s := HybridStorage{}
-	err := s.Init(getDBFile(t), getWalFile(), &JsonLog{})
+	s, err := createHybridStorage(getDBFile(t), getWalFile(), &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 
@@ -64,8 +87,7 @@ func TestHybridStorageDel(t *testing.T) {
 	t.Cleanup(delDBFile)
 	delDBFile()
 
-	s := HybridStorage{}
-	err := s.Init(getDBFile(t), getWalFile(), &JsonLog{})
+	s, err := createHybridStorage(getDBFile(t), getWalFile(), &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 
@@ -103,8 +125,7 @@ func TestHybridStorageHas(t *testing.T) {
 	t.Cleanup(delDBFile)
 	delDBFile()
 
-	s := HybridStorage{}
-	err := s.Init(getDBFile(t), getWalFile(), &JsonLog{})
+	s, err := createHybridStorage(getDBFile(t), getWalFile(), &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 
@@ -144,8 +165,8 @@ func TestHybridStorageAll(t *testing.T) {
 	t.Cleanup(delDBFile)
 	delDBFile()
 
-	s := HybridStorage{}
-	err := s.Init(getDBFile(t), getWalFile(), &JsonLog{})
+	s, err := createHybridStorage(getDBFile(t), getWalFile(), &JsonLog{})
+	assert.Nil(t, err)
 	assert.Nil(t, err)
 	defer s.Close()
 
@@ -204,8 +225,7 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	err = w.Close()
 	assert.Nil(t, err)
 
-	s := HybridStorage{}
-	err = s.Init(dbFile, walFile, &JsonLog{})
+	s, err := createHybridStorage(dbFile, walFile, &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 	records, err := s.All()
@@ -233,8 +253,7 @@ func TestRandomOperationsAndRecovery(t *testing.T) {
 	dbFile := getDBFile(t)
 	walFile := getWalFile()
 
-	s := HybridStorage{}
-	err := s.Init(dbFile, walFile, &BinLog{})
+	s, err := createHybridStorage(dbFile, walFile, &BinLog{})
 	assert.Nil(t, err)
 
 	key := 0
@@ -268,8 +287,7 @@ func TestRandomOperationsAndRecovery(t *testing.T) {
 	s.Close()
 	delDBFile()
 
-	s = HybridStorage{}
-	err = s.Init(dbFile, walFile, &BinLog{})
+	s, err = createHybridStorage(dbFile, walFile, &BinLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 
