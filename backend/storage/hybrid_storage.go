@@ -45,7 +45,8 @@ func (s *HybridStorage) Init(dbFile string, logFile string, l LogFile) error {
 	m.Init(&wal)
 
 	sqlite := SqliteAdapter{}
-	err = sqlite.Init(dbFile, "test")
+	// TODO set machine id
+	err = sqlite.Init(dbFile, "test", "machine0")
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,11 @@ func (s *HybridStorage) Close() {
 	}
 }
 
-func (s *HybridStorage) WithCommitID(_ string) Storage {
+func (s *HybridStorage) WithCommitID(string) Storage {
+	return s
+}
+
+func (s *HybridStorage) WithMachineID(string) Storage {
 	return s
 }
 

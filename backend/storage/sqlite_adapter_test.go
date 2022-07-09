@@ -10,6 +10,7 @@ import (
 
 const fileName = "test.db"
 const tableName = "test"
+const machineName = "machine0"
 
 func getDB(t assert.TestingT) *SqliteAdapter {
 	_, err := os.Stat(fileName)
@@ -18,7 +19,7 @@ func getDB(t assert.TestingT) *SqliteAdapter {
 		assert.Nil(t, err)
 	}
 	a := SqliteAdapter{}
-	err = a.Init(fileName, tableName)
+	err = a.Init(fileName, tableName, machineName)
 	assert.Nil(t, err)
 	return &a
 }

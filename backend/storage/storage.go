@@ -9,6 +9,8 @@ type Storage interface {
 	All() ([][2]string, error)
 	// WithCommitID able to associate an id for the following operation
 	WithCommitID(commitID string) Storage
+	// WithMachineID operate data specifically belongs to a machine
+	WithMachineID(machineID string) Storage
 	// Merge merges s into self, for duplicate keys, our side take precedence
 	Merge(s Storage) error
 }

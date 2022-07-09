@@ -29,7 +29,11 @@ func (s *MapWithWal) Close() error {
 	return nil
 }
 
-func (s *MapWithWal) WithCommitID(_ string) Storage {
+func (s *MapWithWal) WithCommitID(string) Storage {
+	return s
+}
+
+func (s *MapWithWal) WithMachineID(string) Storage {
 	return s
 }
 

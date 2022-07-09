@@ -56,7 +56,11 @@ func newMapWrapper() *mapWrapper {
 	return &mapWrapper{m: make(map[string]string)}
 }
 
-func (s *mapWrapper) WithCommitID(_ string) Storage {
+func (s *mapWrapper) WithCommitID(string) Storage {
+	return s
+}
+
+func (s *mapWrapper) WithMachineID(string) Storage {
 	return s
 }
 
