@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -33,6 +34,7 @@ type SqliteAdapter struct {
 }
 
 const _last_commit_key = "_last_commit"
+const _last_sync_key = "_last_sync"
 
 func (s *SqliteAdapter) WithCommitID(id string) Storage {
 	return &SqliteAdapter{db: s.db, tableName: s.tableName, table: s.table, commitID: id}
@@ -47,6 +49,22 @@ func (s *SqliteAdapter) LastCommit() (string, error) {
 		return "", err
 	}
 	return id, nil
+}
+
+func (s *SqliteAdapter) LastSync() (*SyncStatus, error) {
+	jDoc, err := s.Load(_last_sync_key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &SyncStatus{}, nil
+		}
+		return nil, err
+	}
+	status := SyncStatus{}
+	err = json.Unmarshal([]byte(jDoc), &status)
+	if err != nil {
+		return nil, err
+	}
+	return &status, nil
 }
 
 func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
@@ -90,18 +108,18 @@ func withCommitID(table *gorm.DB, commitID string, f func(tx *gorm.DB) error) er
 func (s *SqliteAdapter) Save(key string, value string) error {
 	if has, err := s.Has(key); has || err != nil {
 		return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
-			return s.table.Save(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+			return tx.Save(&DBRecord{Key: key, MachineID: "", Value: value}).Error
 		})
 	} else {
 		return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
-			return s.table.Create(&DBRecord{Key: key, MachineID: "", Value: value}).Error
+			return tx.Create(&DBRecord{Key: key, MachineID: "", Value: value}).Error
 		})
 	}
 }
 
 func (s *SqliteAdapter) Del(key string) error {
 	return withCommitID(s.table, s.commitID, func(tx *gorm.DB) error {
-		return s.table.Delete(&DBRecord{Key: key}).Error
+		return tx.Delete(&DBRecord{Key: key}).Error
 	})
 }
 
@@ -132,7 +150,7 @@ func (s *SqliteAdapter) All() ([][2]string, error) {
 	}
 	kvs := [][2]string{}
 	for _, rec := range records {
-		if rec.Key == _last_commit_key {
+		if rec.Key == _last_commit_key || rec.Key == _last_sync_key {
 			continue
 		}
 		kvs = append(kvs, [2]string{rec.Key, rec.Value})
