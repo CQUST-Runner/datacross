@@ -253,8 +253,10 @@ func (p *Participant) trySync() {
 	}
 	executable := []*CondenserLogEntry{}
 	for k, entries := range changes {
-		if len(entries) == 1 && entries[0].Owner != p.name {
-			executable = append(executable, entries[0])
+		if len(entries) == 1 {
+			if entries[0].Owner != p.name {
+				executable = append(executable, entries[0])
+			}
 		} else {
 			logger.Warn("conflict changes on key[%v]", k)
 		}
