@@ -10,10 +10,9 @@ message FileHeader {
 
 enum Op {
     None = 0;
-    Add = 1;
-    Del = 2;
-    Modify = 3;
-    Accept = 4;
+    Del = 1;
+    Modify = 2;
+    Discard = 3;
 }
 
 message LogEntry {
@@ -21,4 +20,5 @@ message LogEntry {
     string key = 2;
     string value = 3;
     string gid = 4;
+    repeated string discard_gids = 5;
 }
