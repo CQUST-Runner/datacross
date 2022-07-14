@@ -20,14 +20,24 @@ type DBRecord struct {
 	Value       string // with default column name
 	IsMain      bool   `gorm:"column:is_main"`
 	LatestLogID string `gorm:"latest_log_id"`
+	IsDeleted   bool   `gorm:"is_deleted"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   sql.NullTime `gorm:"index"`
 }
 
 type SyncStatus struct {
-	Pos  map[string]string
-	Time time.Time
+	Pos       map[string]string
+	Time      time.Time
+	MachineID string
+}
+
+func (s *SyncStatus) Position(name string) string {
+	position, ok := s.Pos[name]
+	if !ok {
+		return ""
+	}
+	return position
 }
 
 // SqliteAdapter ...
@@ -187,6 +197,8 @@ func (s *SqliteAdapter) Save(key string, value string) error {
 	}
 }
 
+//TODO: whether to have soft deletion enabled
+//TODO: create index
 func (s *SqliteAdapter) Del(key string) error {
 	return withCommitID(s.workingDB, s.machineID, s.commitID, func(tx *gorm.DB) error {
 		if len(s.machineID) == 0 {
@@ -249,6 +261,10 @@ func (s *SqliteAdapter) All() ([][2]string, error) {
 
 func (s *SqliteAdapter) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
+}
+
+func (s *SqliteAdapter) Discard(key string, gids []string) error {
+	return nil
 }
 
 func _() {
