@@ -85,8 +85,8 @@ func (w *Wal) Append(op int32, key string, value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	entry := LogEntry{Op: op, Key: key, Value: value, Gid: gid}
-	writeSz, err := w.l.AppendEntry(w.f, w.pos, &entry)
+	logOp := LogOperation{Op: op, Key: key, Value: value, Gid: gid}
+	writeSz, err := w.l.AppendEntry(w.f, w.pos, &LogEntry{Ops: []*LogOperation{&logOp}})
 	if err != nil {
 		return "", err
 	}
@@ -110,22 +110,22 @@ func (w *Wal) Append(op int32, key string, value string) (string, error) {
 	return gid, nil
 }
 
-func execLogEntry(entry *LogEntry, s Storage) error {
-	switch entry.Op {
+func execLogEntry(logOp *LogOperation, s Storage) error {
+	switch logOp.Op {
 	case int32(Op_Del):
-		return s.WithCommitID(entry.Gid).Del(entry.Key)
+		return s.WithCommitID(logOp.Gid).Del(logOp.Key)
 	case int32(Op_Modify):
-		return s.WithCommitID(entry.Gid).Save(entry.Key, entry.Value)
+		return s.WithCommitID(logOp.Gid).Save(logOp.Key, logOp.Value)
 	case int32(Op_Discard):
-		return fmt.Errorf("unsupported op[%v]", entry.Op)
+		return fmt.Errorf("unsupported op[%v]", logOp.Op)
 	case int32(Op_None):
-		return fmt.Errorf("unrecognized op[%v]", entry.Op)
+		return fmt.Errorf("unrecognized op[%v]", logOp.Op)
 	default:
-		return fmt.Errorf("unrecognized op[%v]", entry.Op)
+		return fmt.Errorf("unrecognized op[%v]", logOp.Op)
 	}
 }
 
-func foreach(w *Wal, do func(entry *LogEntry) bool) error {
+func foreach(w *Wal, do func(logOp *LogOperation) bool) error {
 	var pos int64 = HeaderSize
 	for pos < w.header.FileEnd {
 		entry := LogEntry{}
@@ -137,8 +137,13 @@ func foreach(w *Wal, do func(entry *LogEntry) bool) error {
 			return fmt.Errorf("read size unexpected")
 		}
 
-		if !do(&entry) {
-			break
+		for _, logOp := range entry.Ops {
+			if logOp == nil {
+				continue
+			}
+			if !do(logOp) {
+				break
+			}
 		}
 		pos += readSz
 	}
@@ -150,8 +155,8 @@ func (w *Wal) Replay(s Storage, start string) error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")
 	}
-	return foreachIn(w, func(entry *LogEntry) bool {
-		err := execLogEntry(entry, s)
+	return foreachIn(w, func(logOp *LogOperation) bool {
+		err := execLogEntry(logOp, s)
 		if err != nil {
 			return false
 		}
@@ -170,28 +175,28 @@ func (w *Wal) Flush() error {
 	return w.f.Flush()
 }
 
-func (w *Wal) Foreach(do func(entry *LogEntry) bool) error {
+func (w *Wal) Foreach(do func(logOp *LogOperation) bool) error {
 	return foreach(w, do)
 }
 
-func foreachIn(w *Wal, do func(entry *LogEntry) bool, start string, end string) error {
+func foreachIn(w *Wal, do func(logOp *LogOperation) bool, start string, end string) error {
 	preInRange := false
 	inRange := len(start) == 0
 	var e error
-	err := foreach(w, func(entry *LogEntry) bool {
-		if len(start) > 0 && entry.Gid == start {
+	err := foreach(w, func(logOp *LogOperation) bool {
+		if len(start) > 0 && logOp.Gid == start {
 			preInRange = true
 		}
 		if preInRange {
 			inRange = true
 			preInRange = false
 		}
-		if len(end) > 0 && entry.Gid == end && inRange {
+		if len(end) > 0 && logOp.Gid == end && inRange {
 			inRange = false
 			return false
 		}
 		if inRange {
-			if !do(entry) {
+			if !do(logOp) {
 				return false
 			}
 		}
@@ -204,6 +209,6 @@ func foreachIn(w *Wal, do func(entry *LogEntry) bool, start string, end string) 
 	return e
 }
 
-func (w *Wal) Range(start string, end string, do func(entry *LogEntry) bool) error {
+func (w *Wal) Range(start string, end string, do func(logOp *LogOperation) bool) error {
 	return foreachIn(w, do, start, end)
 }

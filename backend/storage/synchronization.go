@@ -96,10 +96,10 @@ func isLeading(w *Wal, id1 string, id2 string) (bool, error) {
 	num := 1
 	id1Num := 0
 	id2Num := 0
-	err := w.Foreach(func(entry *LogEntry) bool {
-		if entry.Gid == id1 {
+	err := w.Foreach(func(logOp *LogOperation) bool {
+		if logOp.Gid == id1 {
 			id1Num = num
-		} else if entry.Gid == id2 {
+		} else if logOp.Gid == id2 {
 			id2Num = num
 		}
 		num++
@@ -111,55 +111,55 @@ func isLeading(w *Wal, id1 string, id2 string) (bool, error) {
 	return id1Num > id2Num, nil
 }
 
-type CondenserLogEntry2 struct {
-	LogEntry
+type CondenserLogOperation2 struct {
+	LogOperation
 	MachineID string
 }
 
 type LogCondenser2 struct {
-	m map[string][]*CondenserLogEntry2
+	m map[string][]*CondenserLogOperation2
 }
 
 func (c *LogCondenser2) Init() {
-	c.m = make(map[string][]*CondenserLogEntry2)
+	c.m = make(map[string][]*CondenserLogOperation2)
 }
 
-func (c *LogCondenser2) Append(entry *CondenserLogEntry2) {
+func (c *LogCondenser2) Append(logOp *CondenserLogOperation2) {
 
-	arr, ok := c.m[entry.Key]
+	arr, ok := c.m[logOp.Key]
 	if !ok {
-		c.m[entry.Key] = append(c.m[entry.Key], entry)
+		c.m[logOp.Key] = append(c.m[logOp.Key], logOp)
 		return
 	}
 
 	for i, e := range arr {
-		if e.MachineID == entry.MachineID {
-			arr[i] = entry
+		if e.MachineID == logOp.MachineID {
+			arr[i] = logOp
 			return
 		}
 	}
 
-	c.m[entry.Key] = append(c.m[entry.Key], entry)
+	c.m[logOp.Key] = append(c.m[logOp.Key], logOp)
 }
 
 // TODO save entry num in file header
 func condenseLog(c *SyncContext, start string, end string, condenser *LogCondenser2) error {
-	entries := []*LogEntry{}
-	err := c.w.Range(start, end, func(entry *LogEntry) bool {
-		entries = append(entries, entry)
+	ops := []*LogOperation{}
+	err := c.w.Range(start, end, func(logOp *LogOperation) bool {
+		ops = append(ops, logOp)
 		return true
 	})
 	if err != nil {
 		return err
 	}
-	for _, entry := range entries {
-		if entry == nil {
+	for _, logOp := range ops {
+		if logOp == nil {
 			continue
 		}
 
-		entry2 := CondenserLogEntry2{MachineID: c.machineID}
-		entry2.LogEntry = *gogoproto.Clone(entry).(*LogEntry)
-		condenser.Append(&CondenserLogEntry2{})
+		logOp2 := CondenserLogOperation2{MachineID: c.machineID}
+		logOp2.LogOperation = *gogoproto.Clone(logOp).(*LogOperation)
+		condenser.Append(&CondenserLogOperation2{})
 	}
 	return nil
 }

@@ -76,31 +76,35 @@ func testLogEntry(t assert.TestingT, l LogFormat) {
 
 	testKey := "testKey"
 	testValue := "testValue"
-	entry := LogEntry{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"}
-	n, err := l.AppendEntry(f, -1, &entry)
+	logOp := LogOperation{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"}
+	n, err := l.AppendEntry(f, -1, &LogEntry{Ops: []*LogOperation{&logOp}})
 	assert.Nil(t, err)
 	assert.Greater(t, n, int64(8))
 
-	entry = LogEntry{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"}
-	n, err = l.AppendEntry(f, -1, &entry)
+	logOp = LogOperation{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"}
+	n, err = l.AppendEntry(f, -1, &LogEntry{Ops: []*LogOperation{&logOp}})
 	assert.Nil(t, err)
 	assert.Greater(t, n, int64(8))
 
-	entry = LogEntry{}
+	entry := LogEntry{}
 	n, err = l.ReadEntry(f, HeaderSize, &entry)
 	assert.Nil(t, err)
 	assert.Greater(t, n, int64(8))
-	assert.Equal(t, int32(Op_Modify), entry.Op)
-	assert.Equal(t, testKey+"1", entry.Key)
-	assert.Equal(t, testValue+"1", entry.Value)
+	assert.Equal(t, 1, len(entry.Ops))
+	logOp = *entry.Ops[0]
+	assert.Equal(t, int32(Op_Modify), logOp.Op)
+	assert.Equal(t, testKey+"1", logOp.Key)
+	assert.Equal(t, testValue+"1", logOp.Value)
 
 	entry = LogEntry{}
 	n, err = l.ReadEntry(f, HeaderSize+n, &entry)
 	assert.Nil(t, err)
 	assert.Greater(t, n, int64(8))
-	assert.Equal(t, int32(Op_Modify), entry.Op)
-	assert.Equal(t, testKey+"2", entry.Key)
-	assert.Equal(t, testValue+"2", entry.Value)
+	assert.Equal(t, 1, len(entry.Ops))
+	logOp = *entry.Ops[0]
+	assert.Equal(t, int32(Op_Modify), logOp.Op)
+	assert.Equal(t, testKey+"2", logOp.Key)
+	assert.Equal(t, testValue+"2", logOp.Value)
 }
 
 func TestLogEntry(t *testing.T) {

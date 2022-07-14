@@ -10,15 +10,23 @@ message FileHeader {
 
 enum Op {
     None = 0;
-    Del = 1;
-    Modify = 2;
+    Modify = 1;
+    Del = 2;
     Discard = 3;
 }
 
-message LogEntry {
+message LogOperation {
     int32 op = 1;
     string key = 2;
     string value = 3;
     string gid = 4;
-    repeated string discard_gids = 5;
+    string prev_gid = 5;
+    string prev_value = 6;
+    uint64 seq = 7;
+    string machine_id = 8;
+    string prev_machine_id = 9;
+}
+
+message LogEntry {
+    repeated LogOperation ops = 1;
 }

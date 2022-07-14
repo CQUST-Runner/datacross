@@ -26,7 +26,7 @@ const WalFileName = "0.wal"
 const DBFileName = "0.db"
 const SyncInterval = time.Minute
 
-type CondenserLogEntry struct {
+type CondenserLogOperation struct {
 	Op    int32
 	Key   string
 	Value string
@@ -34,12 +34,12 @@ type CondenserLogEntry struct {
 }
 
 type LogCondenser struct {
-	m               map[string]*CondenserLogEntry
+	m               map[string]*CondenserLogOperation
 	participantName string
 }
 
 func (l *LogCondenser) Init(participantName string) {
-	l.m = make(map[string]*CondenserLogEntry)
+	l.m = make(map[string]*CondenserLogOperation)
 	l.participantName = participantName
 }
 
@@ -52,12 +52,12 @@ func (l *LogCondenser) WithMachineID(string) Storage {
 }
 
 func (l *LogCondenser) Save(key string, value string) error {
-	l.m[key] = &CondenserLogEntry{Op: int32(Op_Modify), Key: key, Value: value, Owner: l.participantName}
+	l.m[key] = &CondenserLogOperation{Op: int32(Op_Modify), Key: key, Value: value, Owner: l.participantName}
 	return nil
 }
 
 func (l *LogCondenser) Del(key string) error {
-	l.m[key] = &CondenserLogEntry{Op: int32(Op_Del), Key: key, Owner: l.participantName}
+	l.m[key] = &CondenserLogOperation{Op: int32(Op_Del), Key: key, Owner: l.participantName}
 	return nil
 }
 
@@ -81,7 +81,7 @@ func (s *LogCondenser) Discard(key string, gids []string) error {
 	return fmt.Errorf("unsupported")
 }
 
-func condenseParticipantLog(wd string, name string, lastSyncPos string) (string, map[string]*CondenserLogEntry, error) {
+func condenseParticipantLog(wd string, name string, lastSyncPos string) (string, map[string]*CondenserLogOperation, error) {
 	p := path.Join(wd, name)
 	walFile := path.Join(p, WalFileName)
 	if !IsFile(walFile) {
@@ -95,7 +95,7 @@ func condenseParticipantLog(wd string, name string, lastSyncPos string) (string,
 	}
 
 	if w.header.LastEntryId == lastSyncPos {
-		return w.header.LastEntryId, make(map[string]*CondenserLogEntry), nil
+		return w.header.LastEntryId, make(map[string]*CondenserLogOperation), nil
 	}
 
 	condenser := LogCondenser{}
@@ -111,8 +111,8 @@ func condenseParticipantLog(wd string, name string, lastSyncPos string) (string,
 	return w.header.LastEntryId, condenser.m, nil
 }
 
-func collectChangesSinceLastSync(wd string, status *SyncStatus) (map[string][]*CondenserLogEntry, error) {
-	result := map[string][]*CondenserLogEntry{}
+func collectChangesSinceLastSync(wd string, status *SyncStatus) (map[string][]*CondenserLogOperation, error) {
+	result := map[string][]*CondenserLogOperation{}
 	for name, pos := range status.Pos {
 		newPos, log, err := condenseParticipantLog(wd, name, pos)
 		if err != nil {
@@ -283,7 +283,7 @@ func (p *Participant) trySync() {
 		logger.Error("collect changes failed[%v]", err)
 		return
 	}
-	executable := []*CondenserLogEntry{}
+	executable := []*CondenserLogOperation{}
 	for k, entries := range changes {
 		if len(entries) == 1 {
 			if entries[0].Owner != p.name {
