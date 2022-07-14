@@ -112,13 +112,11 @@ func (w *Wal) Append(op int32, key string, value string) (string, error) {
 
 func execLogEntry(entry *LogEntry, s Storage) error {
 	switch entry.Op {
-	case int32(Op_Add):
-		return s.WithCommitID(entry.Gid).Save(entry.Key, entry.Value)
 	case int32(Op_Del):
 		return s.WithCommitID(entry.Gid).Del(entry.Key)
 	case int32(Op_Modify):
 		return s.WithCommitID(entry.Gid).Save(entry.Key, entry.Value)
-	case int32(Op_Accept):
+	case int32(Op_Discard):
 		return fmt.Errorf("unsupported op[%v]", entry.Op)
 	case int32(Op_None):
 		return fmt.Errorf("unrecognized op[%v]", entry.Op)
@@ -147,7 +145,36 @@ func foreach(w *Wal, do func(entry *LogEntry) bool) error {
 	return nil
 }
 
-func replay(w *Wal, s Storage, start string, end string) error {
+// Replay start not included
+func (w *Wal) Replay(s Storage, start string) error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+	return foreachIn(w, func(entry *LogEntry) bool {
+		err := execLogEntry(entry, s)
+		if err != nil {
+			return false
+		}
+		return true
+	}, start, "")
+}
+
+func (w *Wal) Flush() error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+	if w.readonly {
+		return nil
+	}
+
+	return w.f.Flush()
+}
+
+func (w *Wal) Foreach(do func(entry *LogEntry) bool) error {
+	return foreach(w, do)
+}
+
+func foreachIn(w *Wal, do func(entry *LogEntry) bool, start string, end string) error {
 	preInRange := false
 	inRange := len(start) == 0
 	var e error
@@ -161,11 +188,10 @@ func replay(w *Wal, s Storage, start string, end string) error {
 		}
 		if len(end) > 0 && entry.Gid == end && inRange {
 			inRange = false
+			return false
 		}
 		if inRange {
-			err := execLogEntry(entry, s)
-			if err != nil {
-				e = err
+			if !do(entry) {
 				return false
 			}
 		}
@@ -178,21 +204,6 @@ func replay(w *Wal, s Storage, start string, end string) error {
 	return e
 }
 
-// Replay start not included
-func (w *Wal) Replay(s Storage, start string) error {
-	if w.broken {
-		return fmt.Errorf("wal is broken")
-	}
-	return replay(w, s, start, "")
-}
-
-func (w *Wal) Flush() error {
-	if w.broken {
-		return fmt.Errorf("wal is broken")
-	}
-	if w.readonly {
-		return nil
-	}
-
-	return w.f.Flush()
+func (w *Wal) Range(start string, end string, do func(entry *LogEntry) bool) error {
+	return foreachIn(w, do, start, end)
 }
