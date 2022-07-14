@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// is_deleted || is_discarded can be removed from storage any time
 type DBRecord struct {
 	Key           string `gorm:"column:key"`
 	Value         string `gorm:"column:value"`
@@ -23,10 +24,16 @@ type DBRecord struct {
 	CurrentLogGid string `gorm:"column:current_log_gid"`
 	PrevLogGid    string `gorm:"column:prev_log_gid"`
 	IsDiscarded   bool   `gorm:"column:is_discarded"`
-	IsMain        bool   `gorm:"column:is_main"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     sql.NullTime `gorm:"index"`
+	IsDeleted     bool   `gorm:"column:is_deleted"`
+	// TODO how to determine
+	IsMain    bool `gorm:"column:is_main"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt sql.NullTime `gorm:"index"`
+}
+
+func (r *DBRecord) Visible() bool {
+	return !r.IsDeleted && !r.IsDiscarded
 }
 
 type SyncStatus struct {
