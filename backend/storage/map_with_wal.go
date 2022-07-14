@@ -52,7 +52,7 @@ func (s *MapWithWal) LastEntryID() string {
 }
 
 func (s *MapWithWal) Save(key string, value string) error {
-	id, err := s.log.Append(int32(Op_Modify), key, value)
+	id, err := s.log.Append(&LogOperation{Op: int32(Op_Modify), Key: key, Value: value})
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (s *MapWithWal) Save(key string, value string) error {
 }
 
 func (s *MapWithWal) Del(key string) error {
-	id, err := s.log.Append(int32(Op_Del), key, "")
+	id, err := s.log.Append(&LogOperation{Op: int32(Op_Del), Key: key, Value: ""})
 	if err != nil {
 		return err
 	}

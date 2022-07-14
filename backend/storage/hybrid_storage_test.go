@@ -214,13 +214,13 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	assert.Nil(t, err)
 	const testKey = "testKey"
 	const testValue = "testValue"
-	_, err = w.Append(int32(Op_Modify), testKey+"1", testValue+"1")
+	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"})
 	assert.Nil(t, err)
-	_, err = w.Append(int32(Op_Modify), testKey+"2", testValue+"2")
+	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"})
 	assert.Nil(t, err)
-	_, err = w.Append(int32(Op_Modify), testKey+"3", testValue+"3")
+	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "3", Value: testValue + "3"})
 	assert.Nil(t, err)
-	_, err = w.Append(int32(Op_Del), testKey+"2", "")
+	_, err = w.Append(&LogOperation{Op: int32(Op_Del), Key: testKey + "2", Value: ""})
 	assert.Nil(t, err)
 	err = w.Close()
 	assert.Nil(t, err)

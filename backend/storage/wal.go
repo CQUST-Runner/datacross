@@ -73,7 +73,8 @@ func (w *Wal) Close() error {
 	return nil
 }
 
-func (w *Wal) Append(op int32, key string, value string) (string, error) {
+// Append multiple operations will be appended as a single log entry
+func (w *Wal) Append(logOp ...*LogOperation) (string, error) {
 	if w.broken {
 		return "", fmt.Errorf("wal is broken")
 	}
@@ -85,8 +86,7 @@ func (w *Wal) Append(op int32, key string, value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	logOp := LogOperation{Op: op, Key: key, Value: value, Gid: gid}
-	writeSz, err := w.l.AppendEntry(w.f, w.pos, &LogEntry{Ops: []*LogOperation{&logOp}})
+	writeSz, err := w.l.AppendEntry(w.f, w.pos, &LogEntry{Ops: logOp})
 	if err != nil {
 		return "", err
 	}
