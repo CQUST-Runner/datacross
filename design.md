@@ -99,7 +99,9 @@ https://github.com/markusmobius/nodeSavePageWE
 - URL前添加 offline/ 快捷保存
 - 支持批量保存
 - 以后阅读和提醒支持
-
+- 增加迁移功能（机器间，如机器不再使用）
+- 增加导出功能（如果不再使用offliner）
+  
 ## 可靠性
 
 保持几份数据文件备份
