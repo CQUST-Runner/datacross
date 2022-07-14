@@ -109,6 +109,10 @@ func (s *MapWithWal) Merge(s2 Storage) error {
 	return nil
 }
 
+func (s *MapWithWal) Discard(key string, gids []string) error {
+	return fmt.Errorf("unsupported")
+}
+
 func _() {
 	var _ Storage = &MapWithWal{}
 }

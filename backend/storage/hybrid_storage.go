@@ -151,6 +151,10 @@ func (s *HybridStorage) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }
 
+func (s *HybridStorage) Discard(key string, gids []string) error {
+	return fmt.Errorf("unsupported")
+}
+
 func _() {
 	var _ Storage = &HybridStorage{}
 }
