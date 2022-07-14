@@ -15,15 +15,18 @@ import (
 )
 
 type DBRecord struct {
-	Key         string `gorm:"column:key"`
-	MachineID   string `gorm:"column:machine_id"`
-	Value       string // with default column name
-	IsMain      bool   `gorm:"column:is_main"`
-	LatestLogID string `gorm:"latest_log_id"`
-	IsDeleted   bool   `gorm:"is_deleted"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   sql.NullTime `gorm:"index"`
+	Key           string `gorm:"column:key"`
+	Value         string `gorm:"column:value"`
+	MachineID     string `gorm:"column:machine_id"`
+	PrevMachineID string `gorm:"column:prev_machine_id"`
+	Seq           uint64 `gorm:"column:seq"`
+	CurrentLogGid string `gorm:"column:current_log_gid"`
+	PrevLogGid    string `gorm:"column:prev_log_gid"`
+	IsDiscarded   bool   `gorm:"column:is_discarded"`
+	IsMain        bool   `gorm:"column:is_main"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     sql.NullTime `gorm:"index"`
 }
 
 type SyncStatus struct {

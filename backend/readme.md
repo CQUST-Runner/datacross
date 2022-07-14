@@ -268,7 +268,7 @@ key，value，seq，gid，prev_gid，is_discarded，is_main，machine_id, prev_m
 - prev_gid即叶子节点父节点gid
 - is_discarded代表该叶子节点无效（在解决冲突时执行了discard操作）
 - is_main表示这是本机跟踪的分支
-- machine_id表示产生本分支节点的机器名
+- machine_id表示产生本节点的机器名
 - prev_machine_id表示产生父节点的机器名
 
 当sqlite已存储当前已知部分树或完整树的叶子节点的值，这些树完整的结构（中间节点是怎么样的）就不重要了，实质上就是，旧的操作日志就不重要了
