@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+type NetworkInfo struct {
+	wd           string
+	participants []string
+}
+
+func (info *NetworkInfo) Others(self string) []string {
+	others := []string{}
+	for _, p := range info.participants {
+		if p != self {
+			others = append(others, p)
+		}
+	}
+	return others
+}
+
 const WalFileName = "0.wal"
 const DBFileName = "0.db"
 const SyncInterval = time.Minute
@@ -62,6 +77,10 @@ func (l *LogCondenser) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }
 
+func (s *LogCondenser) Discard(key string, gids []string) error {
+	return fmt.Errorf("unsupported")
+}
+
 func condenseParticipantLog(wd string, name string, lastSyncPos string) (string, map[string]*CondenserLogEntry, error) {
 	p := path.Join(wd, name)
 	walFile := path.Join(p, WalFileName)
@@ -107,14 +126,14 @@ func collectChangesSinceLastSync(wd string, status *SyncStatus) (map[string][]*C
 	return result, nil
 }
 
-func discoveryOtherParticipants(wd string, name string) ([]string, error) {
+func discoveryAllParticipants(wd string) ([]string, error) {
 	entries, err := os.ReadDir(wd)
 	if err != nil {
 		return nil, err
 	}
 	list := []string{}
 	for _, e := range entries {
-		if !e.IsDir() || e.Name() == name {
+		if !e.IsDir() {
 			continue
 		}
 		sign := path.Join(path.Join(wd, e.Name()), DBFileName)
@@ -126,9 +145,8 @@ func discoveryOtherParticipants(wd string, name string) ([]string, error) {
 }
 
 type Participant struct {
-	wd     string
-	name   string
-	others []string
+	info *NetworkInfo
+	name string
 
 	personalPath string
 	walFile      string
@@ -138,6 +156,21 @@ type Participant struct {
 	s            *HybridStorage
 
 	lastSyncTime time.Time
+}
+
+func getPersonalPath(wd string, pname string) string {
+	personalPath := path.Join(wd, pname)
+	return personalPath
+}
+
+func getWalFilePath(personalPath string) string {
+	walFile := path.Join(personalPath, WalFileName)
+	return walFile
+}
+
+func getDBFilePath(personalPath string) string {
+	dbFile := path.Join(personalPath, DBFileName)
+	return dbFile
 }
 
 // TODO log format converter
@@ -154,9 +187,9 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	}
 	wd = path.Clean(wd)
 
-	personalPath := path.Join(wd, name)
-	walFile := path.Join(personalPath, WalFileName)
-	dbFile := path.Join(personalPath, DBFileName)
+	personalPath := getPersonalPath(wd, name)
+	walFile := getWalFilePath(personalPath)
+	dbFile := getDBFilePath(personalPath)
 
 	if !IsDir(personalPath) {
 		err := os.MkdirAll(personalPath, 0777)
@@ -165,7 +198,7 @@ func (p *Participant) Init(wd string, name string) (err error) {
 		}
 	}
 
-	others, err := discoveryOtherParticipants(wd, name)
+	all, err := discoveryAllParticipants(wd)
 	if err != nil {
 		return err
 	}
@@ -201,9 +234,8 @@ func (p *Participant) Init(wd string, name string) (err error) {
 		return err
 	}
 
-	p.wd = wd
+	p.info = &NetworkInfo{wd: wd, participants: all}
 	p.name = name
-	p.others = others
 	p.personalPath = personalPath
 	p.walFile = walFile
 	p.dbFile = dbFile
@@ -233,7 +265,7 @@ func (p *Participant) trySync() {
 	}
 
 	status := SyncStatus{Pos: make(map[string]string), Time: savedStatus.Time}
-	for _, other := range p.others {
+	for _, other := range p.info.Others(p.name) {
 		if pos, ok := savedStatus.Pos[other]; ok {
 			status.Pos[other] = pos
 		} else {
@@ -246,7 +278,7 @@ func (p *Participant) trySync() {
 		status.Pos[p.name] = ""
 	}
 
-	changes, err := collectChangesSinceLastSync(p.wd, &status)
+	changes, err := collectChangesSinceLastSync(p.info.wd, &status)
 	if err != nil {
 		logger.Error("collect changes failed[%v]", err)
 		return
