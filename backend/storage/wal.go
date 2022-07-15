@@ -182,7 +182,7 @@ func execLogEntry(logOp *LogOperation, s Storage) error {
 	}
 }
 
-func foreach(w *Wal, do func(logOp *LogOperation) bool) error {
+func foreach(w *Wal, do func(pos int64, index int, logOp *LogOperation) bool) error {
 	var pos int64 = HeaderSize
 	for pos < w.header.FileEnd {
 		entry := LogEntry{}
@@ -194,11 +194,11 @@ func foreach(w *Wal, do func(logOp *LogOperation) bool) error {
 			return fmt.Errorf("read size unexpected")
 		}
 
-		for _, logOp := range entry.Ops {
+		for index, logOp := range entry.Ops {
 			if logOp == nil {
 				continue
 			}
-			if !do(logOp) {
+			if !do(pos, index, logOp) {
 				break
 			}
 		}
@@ -212,7 +212,7 @@ func (w *Wal) Replay(s Storage, start string) error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")
 	}
-	return foreachIn(w, func(logOp *LogOperation) bool {
+	return foreachIn(w, func(_ int64, _ int, logOp *LogOperation) bool {
 		err := execLogEntry(logOp, s)
 		if err != nil {
 			return false
@@ -233,27 +233,44 @@ func (w *Wal) Flush() error {
 }
 
 func (w *Wal) Foreach(do func(logOp *LogOperation) bool) error {
-	return foreach(w, do)
+	return foreach(w, func(_ int64, _ int, logOp *LogOperation) bool {
+		return do(logOp)
+	})
 }
 
-func foreachIn(w *Wal, do func(logOp *LogOperation) bool, start string, end string) error {
+func foreachInInternal(w *Wal, do func(pos int64, index int, logOp *LogOperation) bool, start string, end string, includeStart bool, includeEnd bool) error {
 	preInRange := false
+	preOutRange := false
 	inRange := len(start) == 0
 	var e error
-	err := foreach(w, func(logOp *LogOperation) bool {
-		if len(start) > 0 && logOp.Gid == start {
-			preInRange = true
-		}
+	err := foreach(w, func(pos int64, index int, logOp *LogOperation) bool {
 		if preInRange {
 			inRange = true
 			preInRange = false
 		}
-		if len(end) > 0 && logOp.Gid == end && inRange {
+		if preOutRange {
 			inRange = false
 			return false
 		}
+
+		if len(start) > 0 && logOp.Gid == start {
+			if includeStart {
+				inRange = true
+			} else {
+				preInRange = true
+			}
+		}
+		if len(end) > 0 && logOp.Gid == end && inRange {
+			if includeEnd {
+				preOutRange = true
+			} else {
+				inRange = false
+				return false
+			}
+		}
+
 		if inRange {
-			if !do(logOp) {
+			if !do(pos, index, logOp) {
 				return false
 			}
 		}
@@ -266,12 +283,46 @@ func foreachIn(w *Wal, do func(logOp *LogOperation) bool, start string, end stri
 	return e
 }
 
+// with includeStart, includeEnd = false, false
+func foreachIn(w *Wal, do func(pos int64, index int, logOp *LogOperation) bool, start string, end string) error {
+	return foreachInInternal(w, do, start, end, false, false)
+}
+
 func (w *Wal) Range(start string, end string, do func(logOp *LogOperation) bool) error {
-	return foreachIn(w, do, start, end)
+	return foreachIn(w, func(_ int64, _ int, logOp *LogOperation) bool {
+		return do(logOp)
+	}, start, end)
 }
 
 func (w *Wal) Iterator() *WalIterator {
 	i := WalIterator{}
 	i.Init(w)
 	return &i
+}
+
+func (w *Wal) IteratorFrom(start string, inclusive bool) (*WalIterator, error) {
+	var pos int64 = 0
+	var index int = 0
+	found := false
+	err := foreachInInternal(w, func(p int64, i int, logOp *LogOperation) bool {
+		pos = p
+		index = i
+		found = true
+		return false
+	}, start, "", inclusive, false)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("start position not found")
+	}
+	if pos < HeaderSize {
+		return nil, fmt.Errorf("pos unexpected")
+	}
+
+	i := WalIterator{}
+	i.Init(w)
+	i.pos = pos
+	i.index = index
+	return &i, nil
 }
