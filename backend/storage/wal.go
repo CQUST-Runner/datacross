@@ -198,8 +198,8 @@ func execLogEntry(logOp *LogOperation, s Storage) error {
 func foreach(w *Wal, do func(pos int64, entry *LogEntry, index int) bool) error {
 	var pos int64 = HeaderSize
 	for pos < w.header.FileEnd {
-		entry := LogEntry{}
-		readSz, err := w.l.ReadEntry(w.f, pos, &entry)
+		entry := new(LogEntry)
+		readSz, err := w.l.ReadEntry(w.f, pos, entry)
 		if err != nil {
 			return err
 		}
@@ -207,13 +207,18 @@ func foreach(w *Wal, do func(pos int64, entry *LogEntry, index int) bool) error 
 			return fmt.Errorf("read size unexpected")
 		}
 
+		term := false
 		for index, logOp := range entry.Ops {
 			if logOp == nil {
 				continue
 			}
-			if !do(pos, &entry, index) {
+			if !do(pos, entry, index) {
+				term = true
 				break
 			}
+		}
+		if term {
+			break
 		}
 		pos += readSz
 	}
@@ -315,31 +320,20 @@ func (w *Wal) Iterator() *WalIterator {
 }
 
 func (w *Wal) IteratorFrom(start string, inclusive bool) (*WalIterator, error) {
-	var pos int64 = 0
-	var index int = 0
-	var entry *LogEntry = nil
+	i := WalIterator{}
+	i.Init(w)
 	found := false
-	err := foreachInInternal(w, func(p int64, e *LogEntry, i int) bool {
-		pos = p
-		entry = e
-		index = i
-		found = true
-		return false
-	}, start, "", inclusive, false)
-	if err != nil {
-		return nil, err
+	for i.Next() {
+		if i.LogOp().Gid == start {
+			found = true
+			break
+		}
 	}
 	if !found {
 		return nil, fmt.Errorf("start position not found")
 	}
-	if pos < HeaderSize {
-		return nil, fmt.Errorf("pos unexpected")
+	if inclusive {
+		i.index -= 1
 	}
-
-	i := WalIterator{}
-	i.w = w
-	i.pos = pos
-	i.index = index
-	i.entry = entry
 	return &i, nil
 }
