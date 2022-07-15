@@ -6,6 +6,63 @@ import (
 	gogoproto "github.com/gogo/protobuf/proto"
 )
 
+type Iterator interface {
+	Next() bool
+}
+
+type WalIterator struct {
+	w     *Wal
+	pos   int64
+	entry *LogEntry
+	index int
+}
+
+func (i *WalIterator) Init(w *Wal) {
+	i.w = w
+	i.pos = HeaderSize
+	i.entry = nil
+	i.index = 0
+}
+
+func (i *WalIterator) Next() bool {
+	if i.entry != nil && i.index < len(i.entry.Ops)-1 {
+		i.index++
+		return true
+	}
+
+	var entry *LogEntry = nil
+	for i.pos < i.w.header.FileEnd {
+		tmp := LogEntry{}
+		readSz, err := i.w.l.ReadEntry(i.w.f, i.pos, &tmp)
+		if err != nil {
+			return false
+		}
+		if readSz <= 0 {
+			return false
+		}
+		i.pos += readSz
+
+		if len(tmp.Ops) > 0 {
+			entry = &tmp
+			break
+		}
+	}
+	if entry == nil {
+		return false
+	}
+
+	i.entry = entry
+	i.index = 0
+	return true
+}
+
+func (i *WalIterator) LogOp() *LogOperation {
+	if i.entry == nil || i.index >= len(i.entry.Ops) {
+		panic("error state")
+	}
+	return i.entry.Ops[i.index]
+}
+
 type Wal struct {
 	f      File
 	l      LogFormat
@@ -211,4 +268,10 @@ func foreachIn(w *Wal, do func(logOp *LogOperation) bool, start string, end stri
 
 func (w *Wal) Range(start string, end string, do func(logOp *LogOperation) bool) error {
 	return foreachIn(w, do, start, end)
+}
+
+func (w *Wal) Iterator() *WalIterator {
+	i := WalIterator{}
+	i.Init(w)
+	return &i
 }
