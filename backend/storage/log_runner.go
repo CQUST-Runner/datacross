@@ -4,8 +4,6 @@ import (
 	"container/list"
 	"fmt"
 	"strings"
-	"sync"
-	"sync/atomic"
 )
 
 type LeafStorage interface {
@@ -118,7 +116,6 @@ type LogInput struct {
 	machineID string
 	w         *Wal
 	start     string
-	end       string
 }
 
 type ChangeList struct {
@@ -221,32 +218,40 @@ func (r *RunLogResult) Error() error {
 	return r.err
 }
 
-type RunLogContext struct {
-	input map[string]*LogInput
-
-	status     map[string]string
-	changeList *ChangeList
-	errs       sync.Map
-
-	coodinator sync.Mutex
-	blockNum   int32
-	wg         sync.WaitGroup
+type RunLogWorker struct {
+	input     *LogInput
+	position  string
+	err       error
+	pendingOp *LogOperation
+	it        *WalIterator
 }
 
-func (c *RunLogContext) Init(i ...*LogInput) {
-	c.input = map[string]*LogInput{}
-	c.status = make(map[string]string)
+type RunLogContext struct {
+	workers    map[string]*RunLogWorker
+	changeList *ChangeList
+}
+
+func (c *RunLogContext) Init(i ...*LogInput) error {
+	c.workers = make(map[string]*RunLogWorker)
 	changeList := ChangeList{}
 	changeList.Init()
 	c.changeList = &changeList
-	c.blockNum = 0
 
 	for _, input := range i {
 		if input == nil {
 			continue
 		}
-		c.input[input.machineID] = input
+		it, err := input.w.IteratorFrom(input.start, false)
+		if err != nil {
+			return err
+		}
+		c.workers[input.machineID] = &RunLogWorker{
+			input:    input,
+			position: input.start,
+			it:       it,
+		}
 	}
+	return nil
 }
 
 type LogRunner struct {
@@ -347,63 +352,66 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 	return false
 }
 
-// TODO not efficient
-// TODO leverage to unlock
-func (r *LogRunner) runLogWrapper(c *RunLogContext, l *LogInput, logOp *LogOperation) bool {
-	c.coodinator.Lock()
+func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
+	count := 0
 
-	atomic.AddInt32(&c.blockNum, 1)
-	for {
-		if r.runLogInner(c, logOp) {
-			atomic.AddInt32(&c.blockNum, -1)
-			c.status[l.machineID] = logOp.Gid
-			c.coodinator.Unlock()
-			return true
-		} else {
-			if int(atomic.LoadInt32(&c.blockNum)) >= len(c.input) {
-				return false
-			}
-
-			c.coodinator.Unlock()
-			c.coodinator.Lock()
+	if worker.pendingOp != nil {
+		if !r.runLogInner(c, worker.pendingOp) {
+			return false
 		}
+		worker.position = worker.pendingOp.Gid
+		worker.pendingOp = nil
+		count++
 	}
-}
 
-func (r *LogRunner) runLog(c *RunLogContext, l *LogInput) {
-	defer c.wg.Done()
-	err := l.w.Range(l.start, l.end, func(logOp *LogOperation) bool {
-		return r.runLogWrapper(c, l, logOp)
-	})
-	atomic.AddInt32(&c.blockNum, 1)
-	if err != nil {
-		logger.Error("run log failed", err)
-		c.errs.Store(l.machineID, err)
-		return
+	for worker.it.Next() {
+		logOp := worker.it.LogOp()
+		if !r.runLogInner(c, logOp) {
+			worker.pendingOp = logOp
+			return count > 0
+		}
+		worker.position = logOp.Gid
+		count++
 	}
+	return count > 0
 }
 
 func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
-	c := RunLogContext{}
-	c.Init(i...)
-
-	for _, input := range i {
-		c.wg.Add(1)
-		go r.runLog(&c, input)
+	if len(i) == 0 {
+		return nil, fmt.Errorf("empty input")
 	}
-	c.wg.Wait()
+	c := RunLogContext{}
+	err := c.Init(i...)
+	if err != nil {
+		return nil, err
+	}
 
-	var err *RunLogError = nil
-	c.errs.Range(func(key, value any) bool {
-		e, ok := value.(error)
-		if ok {
-			if err == nil {
-				err = &RunLogError{}
+	blockNum := 0
+	for {
+		for _, worker := range c.workers {
+			if r.tryAdvance(&c, worker) {
+				blockNum = 0
+			} else {
+				blockNum++
 			}
-			err.errs = append(err.errs, e)
+			if blockNum >= len(c.workers) {
+				break
+			}
 		}
-		return true
-	})
+		if blockNum >= len(c.workers) {
+			break
+		}
+	}
 
-	return &RunLogResult{changeList: c.changeList, status: c.status, err: err}, nil
+	result := RunLogResult{status: make(map[string]string), changeList: c.changeList}
+	for _, worker := range c.workers {
+		if worker.err != nil {
+			if result.err == nil {
+				result.err = &RunLogError{}
+			}
+			result.err.errs = append(result.err.errs, worker.err)
+		}
+		result.status[worker.input.machineID] = worker.position
+	}
+	return &result, nil
 }
