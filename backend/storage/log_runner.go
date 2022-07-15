@@ -15,13 +15,13 @@ type LeafStorage interface {
 	UpdateLeaf(old *DBRecord, new *DBRecord) error
 }
 
-type MemLeaveStorage struct {
+type MemLeafStorage struct {
 	leaves   *list.List
 	keyIndex map[string][]*list.Element
 	gidIndex map[string]*list.Element
 }
 
-func (m *MemLeaveStorage) Init(initial []*DBRecord) {
+func (m *MemLeafStorage) Init(initial []*DBRecord) {
 	m.leaves = list.New()
 	m.keyIndex = make(map[string][]*list.Element)
 	m.gidIndex = make(map[string]*list.Element)
@@ -34,14 +34,14 @@ func (m *MemLeaveStorage) Init(initial []*DBRecord) {
 	}
 }
 
-func (m *MemLeaveStorage) AddLeaf(record *DBRecord) error {
+func (m *MemLeafStorage) AddLeaf(record *DBRecord) error {
 	e := m.leaves.PushBack(record)
 	m.keyIndex[record.Key] = append(m.keyIndex[record.Key], e)
 	m.gidIndex[record.CurrentLogGid] = e
 	return nil
 }
 
-func (m *MemLeaveStorage) GetLeavesByKey(key string) ([]*DBRecord, error) {
+func (m *MemLeafStorage) GetLeavesByKey(key string) ([]*DBRecord, error) {
 	earr, ok := m.keyIndex[key]
 	if !ok {
 		return nil, nil
@@ -62,7 +62,7 @@ func (m *MemLeaveStorage) GetLeavesByKey(key string) ([]*DBRecord, error) {
 	return result, nil
 }
 
-func (m *MemLeaveStorage) UpdateLeaf(old *DBRecord, new *DBRecord) error {
+func (m *MemLeafStorage) UpdateLeaf(old *DBRecord, new *DBRecord) error {
 	e, ok := m.gidIndex[old.CurrentLogGid]
 	if !ok {
 		return fmt.Errorf("old record not exist")
@@ -73,8 +73,45 @@ func (m *MemLeaveStorage) UpdateLeaf(old *DBRecord, new *DBRecord) error {
 	return nil
 }
 
+func (s *MemLeafStorage) WithCommitID(string) Storage {
+	return s
+}
+
+func (s *MemLeafStorage) WithMachineID(string) Storage {
+	return s
+}
+
+func (s *MemLeafStorage) Save(key string, value string) error {
+	return nil
+}
+
+func (s *MemLeafStorage) Del(key string) error {
+	return nil
+}
+
+func (s *MemLeafStorage) Has(key string) (bool, error) {
+	return false, nil
+}
+
+func (s *MemLeafStorage) Load(key string) (string, error) {
+	return "", fmt.Errorf("not exist")
+}
+
+func (s *MemLeafStorage) All() ([][2]string, error) {
+	return nil, nil
+}
+
+func (s *MemLeafStorage) Merge(Storage) error {
+	return fmt.Errorf("unsupported")
+}
+
+func (s *MemLeafStorage) Discard(key string, gids []string) error {
+	return fmt.Errorf("unsupported")
+}
+
 func init() {
-	var _ LeafStorage = &MemLeaveStorage{}
+	var _ LeafStorage = &MemLeafStorage{}
+	var _ Storage = &MemLeafStorage{}
 }
 
 type LogInput struct {
