@@ -221,7 +221,7 @@ func execLogEntry(logOp *LogOperation, s Storage) error {
 	}
 }
 
-func foreach(w *Wal, do func(pos int64, entry *LogEntry, index int) bool) error {
+func foreach(w *Wal, perEntry bool, do func(pos int64, entry *LogEntry, index int) bool) error {
 	var pos int64 = HeaderSize
 	for pos < w.header.FileEnd {
 		entry := new(LogEntry)
@@ -234,14 +234,18 @@ func foreach(w *Wal, do func(pos int64, entry *LogEntry, index int) bool) error 
 		}
 
 		term := false
-		for index, logOp := range entry.Ops {
-			if logOp == nil {
-				continue
+		if !perEntry {
+			for index, logOp := range entry.Ops {
+				if logOp == nil {
+					continue
+				}
+				if !do(pos, entry, index) {
+					term = true
+					break
+				}
 			}
-			if !do(pos, entry, index) {
-				term = true
-				break
-			}
+		} else {
+			term = !do(pos, entry, 0)
 		}
 		if term {
 			break
@@ -277,7 +281,7 @@ func (w *Wal) Flush() error {
 }
 
 func (w *Wal) Foreach(do func(logOp *LogOperation) bool) error {
-	return foreach(w, func(_ int64, entry *LogEntry, index int) bool {
+	return foreach(w, false, func(_ int64, entry *LogEntry, index int) bool {
 		return do(entry.Ops[index])
 	})
 }
@@ -287,7 +291,7 @@ func foreachInInternal(w *Wal, do func(pos int64, entry *LogEntry, index int) bo
 	preOutRange := false
 	inRange := len(start) == 0
 	var e error
-	err := foreach(w, func(pos int64, entry *LogEntry, index int) bool {
+	err := foreach(w, false, func(pos int64, entry *LogEntry, index int) bool {
 		logOp := entry.Ops[index]
 		if preInRange {
 			inRange = true
