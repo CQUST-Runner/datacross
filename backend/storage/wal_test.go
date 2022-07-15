@@ -222,3 +222,36 @@ func TestWalIteratorFrom(t *testing.T) {
 	}
 	assert.Equal(t, 3, num)
 }
+
+func TestWalRangeIterator(t *testing.T) {
+	delWalFile()
+	t.Cleanup(delWalFile)
+
+	wal := Wal{}
+	err := wal.Init(walFileName, &JsonLog{}, false)
+	assert.Nil(t, err)
+	defer wal.Close()
+
+	const testKey = "testKey"
+	const testValue = "testValue"
+	_, err = wal.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"})
+	assert.Nil(t, err)
+	_, err = wal.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"})
+	assert.Nil(t, err)
+	gid, err := wal.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "3", Value: testValue + "3"})
+	assert.Nil(t, err)
+	_, err = wal.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "3", Value: testValue + "4"})
+	assert.Nil(t, err)
+	gid2, err := wal.Append(&LogOperation{Op: int32(Op_Del), Key: testKey + "1", Value: ""},
+		&LogOperation{Op: int32(Op_Del), Key: testKey + "2", Value: ""})
+	assert.Nil(t, err)
+
+	num := 0
+	i, err := wal.RangeIterator(gid, gid2, true, false)
+	assert.Nil(t, err)
+	for i.Next() {
+		fmt.Println(i.LogOp())
+		num++
+	}
+	assert.Equal(t, 3, num)
+}

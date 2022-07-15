@@ -15,6 +15,12 @@ type WalIterator struct {
 	pos   int64
 	entry *LogEntry
 	index int
+
+	stoped bool
+
+	preStop    bool
+	end        string
+	includeEnd bool
 }
 
 func (i *WalIterator) Init(w *Wal) {
@@ -24,7 +30,27 @@ func (i *WalIterator) Init(w *Wal) {
 	i.index = 0
 }
 
-func (i *WalIterator) Next() bool {
+func (i *WalIterator) Next() (hasNext bool) {
+	if i.stoped {
+		return false
+	}
+	if i.preStop {
+		return false
+	}
+	defer func() {
+		if hasNext {
+			if len(i.end) > 0 && i.LogOp().Gid == i.end {
+				if i.includeEnd {
+					i.preStop = true
+				} else {
+					hasNext = false
+				}
+			}
+		}
+		if !hasNext {
+			i.stoped = true
+		}
+	}()
 	if i.entry != nil && i.index < len(i.entry.Ops)-1 {
 		i.index++
 		return true
@@ -336,4 +362,14 @@ func (w *Wal) IteratorFrom(start string, inclusive bool) (*WalIterator, error) {
 		i.index -= 1
 	}
 	return &i, nil
+}
+
+func (w *Wal) RangeIterator(start string, end string, includeStart bool, includeEnd bool) (*WalIterator, error) {
+	i, err := w.IteratorFrom(start, includeStart)
+	if err != nil {
+		return nil, err
+	}
+	i.end = end
+	i.includeEnd = includeEnd
+	return i, nil
 }
