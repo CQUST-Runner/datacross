@@ -50,6 +50,13 @@ func (s *SyncStatus) Position(name string) string {
 	return position
 }
 
+func (s *SyncStatus) Merge(other *SyncStatus) {
+	for id, pos := range other.Pos {
+		s.Pos[id] = pos
+	}
+	s.Time = other.Time
+}
+
 // SqliteAdapter ...
 type SqliteAdapter struct {
 	db        *gorm.DB
