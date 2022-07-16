@@ -36,6 +36,10 @@ sqlite 数据：
     单文件网页文件名
 ```
 
+解决冲突：
+
+struct加tag以优化冲突diff的展现形式？
+
 ## 网页保存
 
 保存网页的技术要求
@@ -116,3 +120,6 @@ https://github.com/markusmobius/nodeSavePageWE
 - https://github.com/pjamar/htmls-to-datasette
     - 功能比较单一
   
+有道云笔记和印象笔记也有此功能
+
+也许offliner将不止管理网页文件，还可在浏览器管理、预览、分享其他多种类型文件，定位为系统文件管理的一种扩展？
