@@ -11,6 +11,7 @@ type NodeStorage interface {
 	Add(record *DBRecord) error
 	Replace(old string, new *DBRecord) error
 	Del(gid string) error
+	AllNodes() ([]*DBRecord, error)
 }
 
 type NodeStorageImpl struct {
@@ -110,4 +111,12 @@ func (n *NodeStorageImpl) Del(gid string) error {
 	}
 	n.delNodeInternal(e)
 	return nil
+}
+
+func (n *NodeStorageImpl) AllNodes() ([]*DBRecord, error) {
+	results := make([]*DBRecord, n.l.Len())
+	for e := n.l.Front(); e != nil; e = e.Next() {
+		results = append(results, e.Value.(*DBRecord))
+	}
+	return results, nil
 }
