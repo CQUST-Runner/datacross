@@ -1,116 +1,9 @@
 package storage
 
 import (
-	"container/list"
 	"fmt"
 	"strings"
 )
-
-type LeafStorage interface {
-	AddLeaf(record *DBRecord) error
-	GetLeavesByKey(key string) ([]*DBRecord, error)
-	// UpdateLeaf the key of old and new should be same
-	UpdateLeaf(old *DBRecord, new *DBRecord) error
-}
-
-type MemLeafStorage struct {
-	leaves   *list.List
-	keyIndex map[string][]*list.Element
-	gidIndex map[string]*list.Element
-}
-
-func (m *MemLeafStorage) Init(initial []*DBRecord) {
-	m.leaves = list.New()
-	m.keyIndex = make(map[string][]*list.Element)
-	m.gidIndex = make(map[string]*list.Element)
-
-	for _, record := range initial {
-		if record == nil {
-			continue
-		}
-		_ = m.AddLeaf(record)
-	}
-}
-
-func (m *MemLeafStorage) AddLeaf(record *DBRecord) error {
-	e := m.leaves.PushBack(record)
-	m.keyIndex[record.Key] = append(m.keyIndex[record.Key], e)
-	m.gidIndex[record.CurrentLogGid] = e
-	return nil
-}
-
-func (m *MemLeafStorage) GetLeavesByKey(key string) ([]*DBRecord, error) {
-	earr, ok := m.keyIndex[key]
-	if !ok {
-		return nil, nil
-	}
-	result := []*DBRecord{}
-	for _, e := range earr {
-		if e == nil {
-			continue
-		}
-		record, ok := e.Value.(*DBRecord)
-		if !ok {
-			continue
-		}
-		if record.Visible() {
-			result = append(result, record)
-		}
-	}
-	return result, nil
-}
-
-func (m *MemLeafStorage) UpdateLeaf(old *DBRecord, new *DBRecord) error {
-	e, ok := m.gidIndex[old.CurrentLogGid]
-	if !ok {
-		return fmt.Errorf("old record not exist")
-	}
-	e.Value = new
-	delete(m.gidIndex, old.CurrentLogGid)
-	m.gidIndex[new.CurrentLogGid] = e
-	return nil
-}
-
-func (s *MemLeafStorage) WithCommitID(string) Storage {
-	return s
-}
-
-func (s *MemLeafStorage) WithMachineID(string) Storage {
-	return s
-}
-
-func (s *MemLeafStorage) Save(key string, value string) error {
-	return nil
-}
-
-func (s *MemLeafStorage) Del(key string) error {
-	return nil
-}
-
-func (s *MemLeafStorage) Has(key string) (bool, error) {
-	return false, nil
-}
-
-func (s *MemLeafStorage) Load(key string) (string, error) {
-	return "", fmt.Errorf("not exist")
-}
-
-func (s *MemLeafStorage) All() ([][2]string, error) {
-	return nil, nil
-}
-
-func (s *MemLeafStorage) Merge(Storage) error {
-	return fmt.Errorf("unsupported")
-}
-
-func (s *MemLeafStorage) Discard(key string, gids []string) error {
-	return fmt.Errorf("unsupported")
-}
-
-func init() {
-	var _ LeafStorage = &MemLeafStorage{}
-	var _ Storage = &MemLeafStorage{}
-}
 
 type LogInput struct {
 	machineID string
@@ -256,10 +149,10 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 
 type LogRunner struct {
 	machineID string
-	s         LeafStorage
+	s         NodeStorage
 }
 
-func (r *LogRunner) Init(machineID string, s LeafStorage) error {
+func (r *LogRunner) Init(machineID string, s NodeStorage) error {
 	r.machineID = machineID
 	r.s = s
 	return nil
@@ -279,7 +172,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)
-		err := r.s.AddLeaf(&record)
+		err := r.s.Add(&record)
 		if err != nil {
 			logger.Error("add leaf[%v] [%v] failed", record.Key, record.CurrentLogGid)
 			return false
@@ -287,7 +180,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		return true
 	}
 
-	leavesOfKey, err := r.s.GetLeavesByKey(logOp.Key)
+	leavesOfKey, err := r.s.GetByKey(logOp.Key)
 	if err != nil {
 		logger.Error("get leaves[%v] failed[%v]", logOp.Key, err)
 		return false
@@ -318,7 +211,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(parent, &record)
-		err := r.s.UpdateLeaf(parent, &record)
+		err := r.s.Replace(parent.CurrentLogGid, &record)
 		if err != nil {
 			logger.Error("update leaf of [%v] [%v]->[%v] failed", parent.Key, parent.CurrentLogGid, record.CurrentLogGid)
 			return false
@@ -341,7 +234,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)
-		err := r.s.AddLeaf(&record)
+		err := r.s.Add(&record)
 		if err != nil {
 			logger.Error("add leaf of key[%v] [%v] failed", record.Key, record.CurrentLogGid)
 			return false

@@ -74,7 +74,10 @@ func (n *NodeStorageImpl) GetByKey(key string) ([]*DBRecord, error) {
 
 	records := make([]*DBRecord, elements.Len())
 	for e := elements.Front(); e != nil; e = e.Next() {
-		records = append(records, e.Value.(*list.Element).Value.(*DBRecord))
+		record := e.Value.(*list.Element).Value.(*DBRecord)
+		if record.Visible() {
+			records = append(records, record)
+		}
 	}
 	return records, nil
 }
@@ -95,6 +98,10 @@ func (n *NodeStorageImpl) Replace(old string, new *DBRecord) error {
 	e := n.getByGidInternal(old)
 	if e == nil {
 		return fmt.Errorf("old not exist")
+	}
+
+	if e.Value.(*DBRecord).Key != new.Key {
+		return fmt.Errorf("key not match")
 	}
 
 	if err := n.addNodeInternal(new); err != nil {
