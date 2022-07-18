@@ -229,7 +229,7 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	}()
 
 	s := HybridStorage{}
-	err = s.Init(m, &sqlite)
+	// err = s.Init(m, &sqlite)
 	if err != nil {
 		return err
 	}

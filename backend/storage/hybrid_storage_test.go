@@ -17,18 +17,8 @@ func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridSto
 		return nil, err
 	}
 
-	m := &MapWithWal{}
-	m.Init(&wal)
-
-	sqlite := SqliteAdapter{}
-	// TODO set machine id
-	err = sqlite.Init(dbFile, "test", "machine0")
-	if err != nil {
-		return nil, err
-	}
-
 	s := HybridStorage{}
-	err = s.Init(m, &sqlite)
+	err = s.Init(&wal)
 	if err != nil {
 		return nil, err
 	}
