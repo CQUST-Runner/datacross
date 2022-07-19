@@ -188,16 +188,41 @@ func (s *HybridStorage) WithMachineID(string) Storage {
 	return s
 }
 
-func findMain(a []*DBRecord) *DBRecord {
-	for _, record := range a {
-		if record == nil {
-			continue
-		}
-		if record.Visible() && record.IsMain {
-			return record
+// suppose Visible()==true
+func compareNode(a *DBRecord, b *DBRecord) int {
+	if a == nil && b == nil {
+		return 0
+	}
+	if a == nil {
+		return 1
+	}
+	if b == nil {
+		return -1
+	}
+	if a.CurrentMachineChanges > b.CurrentMachineChanges {
+		return 1
+	} else if a.CurrentMachineChanges < b.CurrentMachineChanges {
+		return -1
+	} else {
+		if a.MachineID > b.MachineID {
+			return 1
+		} else if a.MachineID < b.MachineID {
+			return -1
+		} else {
+			// should not be
+			return 0
 		}
 	}
-	return nil
+}
+
+func findMain(a []*DBRecord) *DBRecord {
+	var maxRecord *DBRecord
+	for _, record := range a {
+		if compareNode(record, maxRecord) > 0 {
+			maxRecord = record
+		}
+	}
+	return maxRecord
 }
 
 func (s *HybridStorage) Save(key string, value string) error {
@@ -223,16 +248,16 @@ func (s *HybridStorage) Save(key string, value string) error {
 		}
 
 		return s.f.AddLeaf(&DBRecord{
-			Key:           key,
-			Value:         value,
-			MachineID:     s.machineID,
-			PrevMachineID: "",
-			Seq:           0,
-			CurrentLogGid: gid,
-			PrevLogGid:    "",
-			IsDiscarded:   false,
-			IsDeleted:     false,
-			IsMain:        true,
+			Key:                   key,
+			Value:                 value,
+			MachineID:             s.machineID,
+			PrevMachineID:         "",
+			Seq:                   0,
+			CurrentLogGid:         gid,
+			PrevLogGid:            "",
+			IsDiscarded:           false,
+			IsDeleted:             false,
+			CurrentMachineChanges: 1,
 		}, false)
 	}
 
@@ -256,16 +281,16 @@ func (s *HybridStorage) Save(key string, value string) error {
 		return err
 	}
 	return s.f.AddLeaf(&DBRecord{
-		Key:           key,
-		Value:         value,
-		MachineID:     s.machineID,
-		PrevMachineID: main.PrevMachineID,
-		Seq:           main.Seq + 1,
-		CurrentLogGid: gid,
-		PrevLogGid:    main.CurrentLogGid,
-		IsDiscarded:   false,
-		IsDeleted:     false,
-		IsMain:        main.IsMain,
+		Key:                   key,
+		Value:                 value,
+		MachineID:             s.machineID,
+		PrevMachineID:         main.PrevMachineID,
+		Seq:                   main.Seq + 1,
+		CurrentLogGid:         gid,
+		PrevLogGid:            main.CurrentLogGid,
+		IsDiscarded:           false,
+		IsDeleted:             false,
+		CurrentMachineChanges: main.CurrentMachineChanges + 1,
 	}, false)
 }
 
@@ -296,15 +321,15 @@ func (s *HybridStorage) Del(key string) error {
 		return err
 	}
 	return s.f.AddLeaf(&DBRecord{
-		Key:           key,
-		MachineID:     s.machineID,
-		PrevMachineID: main.PrevMachineID,
-		Seq:           main.Seq + 1,
-		CurrentLogGid: gid,
-		PrevLogGid:    main.CurrentLogGid,
-		IsDiscarded:   false,
-		IsDeleted:     true,
-		IsMain:        main.IsMain,
+		Key:                   key,
+		MachineID:             s.machineID,
+		PrevMachineID:         main.PrevMachineID,
+		Seq:                   main.Seq + 1,
+		CurrentLogGid:         gid,
+		PrevLogGid:            main.CurrentLogGid,
+		IsDiscarded:           false,
+		IsDeleted:             true,
+		CurrentMachineChanges: main.CurrentMachineChanges + 1,
 	}, false)
 }
 
@@ -338,14 +363,26 @@ func (s *HybridStorage) All() ([][2]string, error) {
 		return nil, err
 	}
 
-	results := make([][2]string, 0)
+	m := make(map[string]*DBRecord)
 	for _, l := range leaves {
-		if l == nil {
+		if l == nil || !l.Visible() {
 			continue
 		}
-		if l.Visible() && l.IsMain {
-			results = append(results, [2]string{l.Key, l.Value})
+		e, ok := m[l.Key]
+		if !ok {
+			m[l.Key] = e
+
+		} else {
+			if compareNode(l, e) > 0 {
+				m[l.Key] = e
+			}
 		}
+
+	}
+
+	results := make([][2]string, 0)
+	for _, l := range m {
+		results = append(results, [2]string{l.Key, l.Value})
 	}
 	return results, nil
 }

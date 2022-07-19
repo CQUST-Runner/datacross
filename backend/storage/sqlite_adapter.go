@@ -16,20 +16,19 @@ import (
 
 // is_deleted || is_discarded can be removed from storage any time
 type DBRecord struct {
-	Key           string `gorm:"column:key"`
-	Value         string `gorm:"column:value"`
-	MachineID     string `gorm:"column:machine_id"`
-	PrevMachineID string `gorm:"column:prev_machine_id"`
-	Seq           uint64 `gorm:"column:seq"`
-	CurrentLogGid string `gorm:"column:current_log_gid"`
-	PrevLogGid    string `gorm:"column:prev_log_gid"`
-	IsDiscarded   bool   `gorm:"column:is_discarded"`
-	IsDeleted     bool   `gorm:"column:is_deleted"`
-	// TODO how to determine
-	IsMain    bool `gorm:"column:is_main"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt sql.NullTime `gorm:"index"`
+	Key                   string `gorm:"column:key"`
+	Value                 string `gorm:"column:value"`
+	MachineID             string `gorm:"column:machine_id"`
+	PrevMachineID         string `gorm:"column:prev_machine_id"`
+	Seq                   uint64 `gorm:"column:seq"`
+	CurrentLogGid         string `gorm:"column:current_log_gid"`
+	PrevLogGid            string `gorm:"column:prev_log_gid"`
+	IsDiscarded           bool   `gorm:"column:is_discarded"`
+	IsDeleted             bool   `gorm:"column:is_deleted"`
+	CurrentMachineChanges int32  `gorm:"current_machine_changes"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	DeletedAt             sql.NullTime `gorm:"index"`
 }
 
 func (r *DBRecord) Visible() bool {
