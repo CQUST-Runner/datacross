@@ -182,28 +182,47 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, error) {
 		logOp[i].Gid = gids[i]
 	}
 	lastGid := gids[len(gids)-1]
-	writeSz, err := w.l.AppendEntry(w.f, w.pos, &LogEntry{Ops: logOp})
+
+	err := w.AppendRaw(logOp...)
 	if err != nil {
 		return "", err
 	}
+	return lastGid, nil
+}
+
+func (w *Wal) AppendRaw(logOp ...*LogOperation) error {
+	if w.broken {
+		return fmt.Errorf("wal is broken")
+	}
+	if w.readonly {
+		return fmt.Errorf("append to readonly file")
+	}
+	if len(logOp) == 0 {
+		return fmt.Errorf("empty input")
+	}
+
+	writeSz, err := w.l.AppendEntry(w.f, w.pos, &LogEntry{Ops: logOp})
+	if err != nil {
+		return err
+	}
 	if writeSz == 0 {
-		return "", fmt.Errorf("write size is 0, suspicious")
+		return fmt.Errorf("write size is 0, suspicious")
 	}
 
 	newPos := w.pos + writeSz
 	newHeader := gogoproto.Clone(w.header).(*FileHeader)
 	newHeader.FileEnd = newPos
-	newHeader.LastEntryId = lastGid
+	newHeader.LastEntryId = logOp[len(logOp)-1].Gid
 	err = w.l.WriteHeader(w.f, newHeader)
 	// This should not be happen
 	if err != nil {
 		w.broken = true
-		return "", err
+		return err
 	}
 
 	w.pos = newPos
 	w.header = newHeader
-	return lastGid, nil
+	return nil
 }
 
 func execLogEntry(logOp *LogOperation, s Storage) error {
