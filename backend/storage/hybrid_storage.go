@@ -230,6 +230,8 @@ func (s *HybridStorage) Load(key string) (string, error) {
 	return main.Value, nil
 }
 
+// TODO findMain有问题
+// TODO run log时本机引用其他机器的日志
 func (s *HybridStorage) All() ([][2]string, error) {
 	leaves, err := s.f.AllLeaves()
 	if err != nil {
