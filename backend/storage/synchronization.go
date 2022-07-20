@@ -77,10 +77,14 @@ func (c *SyncContext) Close() {
 	}
 }
 
-func doSync(self string, info *NetworkInfo) error {
+// 一个接口返回确认信息，一个接口清理wal
+// 统一调用execLogOp
+// currentValue的计算抽象
+// sqlite作为initial
+func doSync(p *Participant, info *NetworkInfo) error {
 	found := false
 	for _, other := range info.participants {
-		if self == other {
+		if p.name == other {
 			found = true
 		}
 	}
@@ -98,5 +102,22 @@ func doSync(self string, info *NetworkInfo) error {
 		m[p] = &c
 	}
 
+	s := NodeStorageImpl{}
+	runner := LogRunner{}
+	if err := runner.Init(p.name, &s); err != nil {
+		return err
+	}
+
+	inputs := []*LogInput{}
+	for _, v := range m {
+		inputs = append(inputs, &LogInput{w: v.w, machineID: v.machineID, start: ""})
+	}
+	_, err := runner.Run(inputs...)
+	if err != nil {
+		return err
+	}
+	f := GrowOnlyForestImpl{}
+	f.Init(&s)
+	p.s.f = &f
 	return nil
 }

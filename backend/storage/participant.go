@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"time"
@@ -107,7 +108,7 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	}
 
 	s := HybridStorage{}
-	// err = s.Init(m, &sqlite)
+	err = s.Init(&wal, name)
 	if err != nil {
 		return err
 	}
@@ -124,13 +125,16 @@ func (p *Participant) Init(wd string, name string) (err error) {
 
 func (p *Participant) Close() {
 	if p.s != nil {
-		// it closes m and sqlite
 		p.s.Close()
 		p.s = nil
 	}
 }
 
 func (p *Participant) trySync() {
+	err := doSync(p, p.info)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func (p *Participant) S() Storage {
