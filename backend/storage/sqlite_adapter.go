@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,22 @@ import (
 
 	"gorm.io/gorm"
 )
+
+type ChangeCount map[string]int32
+
+// Scan implements the Scanner interface.
+func (n *ChangeCount) Scan(value any) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("convert value to []byte failed")
+	}
+	return json.Unmarshal(b, n)
+}
+
+// Value implements the driver Valuer interface.
+func (n ChangeCount) Value() (driver.Value, error) {
+	return json.Marshal(n)
+}
 
 // is_deleted || is_discarded can be removed from storage any time
 type DBRecord struct {
@@ -26,7 +43,7 @@ type DBRecord struct {
 	IsDiscarded   bool   `gorm:"column:is_discarded"`
 	IsDeleted     bool   `gorm:"column:is_deleted"`
 	// TODO: 日志填写changes字段
-	MachineChangeCount map[string]int32
+	MachineChangeCount ChangeCount
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	DeletedAt          sql.NullTime `gorm:"index"`
