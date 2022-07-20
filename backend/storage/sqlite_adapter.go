@@ -16,23 +16,49 @@ import (
 
 // is_deleted || is_discarded can be removed from storage any time
 type DBRecord struct {
-	Key                   string `gorm:"column:key"`
-	Value                 string `gorm:"column:value"`
-	MachineID             string `gorm:"column:machine_id"`
-	PrevMachineID         string `gorm:"column:prev_machine_id"`
-	Seq                   uint64 `gorm:"column:seq"`
-	CurrentLogGid         string `gorm:"column:current_log_gid"`
-	PrevLogGid            string `gorm:"column:prev_log_gid"`
-	IsDiscarded           bool   `gorm:"column:is_discarded"`
-	IsDeleted             bool   `gorm:"column:is_deleted"`
-	CurrentMachineChanges int32  `gorm:"current_machine_changes"`
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	DeletedAt             sql.NullTime `gorm:"index"`
+	Key           string `gorm:"column:key"`
+	Value         string `gorm:"column:value"`
+	MachineID     string `gorm:"column:machine_id"`
+	PrevMachineID string `gorm:"column:prev_machine_id"`
+	Seq           uint64 `gorm:"column:seq"`
+	CurrentLogGid string `gorm:"column:current_log_gid"`
+	PrevLogGid    string `gorm:"column:prev_log_gid"`
+	IsDiscarded   bool   `gorm:"column:is_discarded"`
+	IsDeleted     bool   `gorm:"column:is_deleted"`
+	// TODO: 日志填写changes字段
+	MachineChangeCount map[string]int32
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	DeletedAt          sql.NullTime `gorm:"index"`
 }
 
 func (r *DBRecord) Visible() bool {
 	return !r.IsDeleted && !r.IsDiscarded
+}
+
+func (r *DBRecord) Changes(machineID string) int32 {
+	if r.MachineChangeCount == nil {
+		return 0
+	}
+	if changes, ok := r.MachineChangeCount[machineID]; ok {
+		return changes
+	}
+	return 0
+}
+
+func (r *DBRecord) AddChange(machineID string, changes int32) map[string]int32 {
+	m := make(map[string]int32)
+	if r.MachineChangeCount != nil {
+		for k, v := range r.MachineChangeCount {
+			m[k] = v
+		}
+	}
+	if _, ok := m[machineID]; ok {
+		m[machineID] += changes
+	} else {
+		m[machineID] = changes
+	}
+	return m
 }
 
 type SyncStatus struct {

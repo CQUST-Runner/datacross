@@ -25,7 +25,7 @@ message LogOperation {
     uint64 seq = 7;
     string machine_id = 8;
     string prev_machine_id = 9;
-    int32 changes = 10; // total changes from prev_machine_id
+    map<string, int32> changes = 10;
 }
 
 message LogEntry {

@@ -159,20 +159,16 @@ func (r *LogRunner) Init(machineID string, s NodeStorage) error {
 }
 
 func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
-	localMachineChange := 0
-	if logOp.MachineId == r.machineID {
-		localMachineChange = 1
-	}
 	if logOp.Seq == 0 {
 		record := DBRecord{
-			Key:                   logOp.Key,
-			Value:                 logOp.Value,
-			MachineID:             logOp.MachineId,
-			Seq:                   logOp.Seq,
-			CurrentLogGid:         logOp.Gid,
-			IsDeleted:             logOp.Op == int32(Op_Del),
-			IsDiscarded:           logOp.Op == int32(Op_Discard),
-			CurrentMachineChanges: int32(localMachineChange),
+			Key:                logOp.Key,
+			Value:              logOp.Value,
+			MachineID:          logOp.MachineId,
+			Seq:                logOp.Seq,
+			CurrentLogGid:      logOp.Gid,
+			IsDeleted:          logOp.Op == int32(Op_Del),
+			IsDiscarded:        logOp.Op == int32(Op_Discard),
+			MachineChangeCount: map[string]int32{logOp.MachineId: 1},
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)
@@ -202,16 +198,16 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 	}
 	if parent != nil {
 		record := DBRecord{
-			Key:                   logOp.Key,
-			Value:                 logOp.Value,
-			MachineID:             logOp.MachineId,
-			PrevMachineID:         parent.MachineID,
-			Seq:                   logOp.Seq,
-			CurrentLogGid:         logOp.Gid,
-			PrevLogGid:            parent.CurrentLogGid,
-			IsDeleted:             logOp.Op == int32(Op_Del),
-			IsDiscarded:           logOp.Op == int32(Op_Discard),
-			CurrentMachineChanges: parent.CurrentMachineChanges + int32(localMachineChange),
+			Key:                logOp.Key,
+			Value:              logOp.Value,
+			MachineID:          logOp.MachineId,
+			PrevMachineID:      parent.MachineID,
+			Seq:                logOp.Seq,
+			CurrentLogGid:      logOp.Gid,
+			PrevLogGid:         parent.CurrentLogGid,
+			IsDeleted:          logOp.Op == int32(Op_Del),
+			IsDiscarded:        logOp.Op == int32(Op_Discard),
+			MachineChangeCount: parent.AddChange(logOp.MachineId, 1),
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(parent, &record)
@@ -225,16 +221,16 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 
 	if isSmallOrEqual && logOp.PrevMachineId == r.machineID {
 		record := DBRecord{
-			Key:                   logOp.Key,
-			Value:                 logOp.Value,
-			MachineID:             logOp.MachineId,
-			PrevMachineID:         logOp.PrevMachineId,
-			Seq:                   logOp.Seq,
-			CurrentLogGid:         logOp.Gid,
-			PrevLogGid:            logOp.PrevGid,
-			IsDeleted:             logOp.Op == int32(Op_Del),
-			IsDiscarded:           logOp.Op == int32(Op_Discard),
-			CurrentMachineChanges: logOp.Changes,
+			Key:                logOp.Key,
+			Value:              logOp.Value,
+			MachineID:          logOp.MachineId,
+			PrevMachineID:      logOp.PrevMachineId,
+			Seq:                logOp.Seq,
+			CurrentLogGid:      logOp.Gid,
+			PrevLogGid:         logOp.PrevGid,
+			IsDeleted:          logOp.Op == int32(Op_Del),
+			IsDiscarded:        logOp.Op == int32(Op_Discard),
+			MachineChangeCount: logOp.Changes,
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)

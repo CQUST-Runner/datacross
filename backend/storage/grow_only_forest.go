@@ -27,14 +27,14 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 
 	if record.Seq == 0 {
 		return f.s.Add(&DBRecord{
-			Key:                   record.Key,
-			Value:                 record.Value,
-			MachineID:             record.MachineID,
-			Seq:                   record.Seq,
-			CurrentLogGid:         record.CurrentLogGid,
-			IsDiscarded:           record.IsDiscarded,
-			IsDeleted:             record.IsDeleted,
-			CurrentMachineChanges: record.CurrentMachineChanges,
+			Key:                record.Key,
+			Value:              record.Value,
+			MachineID:          record.MachineID,
+			Seq:                record.Seq,
+			CurrentLogGid:      record.CurrentLogGid,
+			IsDiscarded:        record.IsDiscarded,
+			IsDeleted:          record.IsDeleted,
+			MachineChangeCount: record.MachineChangeCount,
 		})
 	}
 
@@ -45,29 +45,29 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 	if parent != nil {
 		// only store the leaves
 		return f.s.Replace(parent.CurrentLogGid, &DBRecord{
-			Key:                   record.Key,
-			Value:                 record.Value,
-			MachineID:             record.MachineID,
-			PrevMachineID:         parent.MachineID,
-			Seq:                   parent.Seq + 1,
-			CurrentLogGid:         record.CurrentLogGid,
-			PrevLogGid:            parent.CurrentLogGid,
-			IsDiscarded:           record.IsDiscarded,
-			IsDeleted:             record.IsDeleted,
-			CurrentMachineChanges: record.CurrentMachineChanges,
+			Key:                record.Key,
+			Value:              record.Value,
+			MachineID:          record.MachineID,
+			PrevMachineID:      parent.MachineID,
+			Seq:                parent.Seq + 1,
+			CurrentLogGid:      record.CurrentLogGid,
+			PrevLogGid:         parent.CurrentLogGid,
+			IsDiscarded:        record.IsDiscarded,
+			IsDeleted:          record.IsDeleted,
+			MachineChangeCount: record.MachineChangeCount,
 		})
 	} else {
 		if force {
 			// we'll allow it if it is required to do so
 			return f.s.Add(&DBRecord{
-				Key:                   record.Key,
-				Value:                 record.Value,
-				MachineID:             record.MachineID,
-				Seq:                   record.Seq,
-				CurrentLogGid:         record.CurrentLogGid,
-				IsDiscarded:           record.IsDiscarded,
-				IsDeleted:             record.IsDeleted,
-				CurrentMachineChanges: record.CurrentMachineChanges,
+				Key:                record.Key,
+				Value:              record.Value,
+				MachineID:          record.MachineID,
+				Seq:                record.Seq,
+				CurrentLogGid:      record.CurrentLogGid,
+				IsDiscarded:        record.IsDiscarded,
+				IsDeleted:          record.IsDeleted,
+				MachineChangeCount: record.MachineChangeCount,
 			})
 		} else {
 			return fmt.Errorf("cannot find parent node")

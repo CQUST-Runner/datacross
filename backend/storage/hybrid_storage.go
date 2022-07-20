@@ -189,7 +189,7 @@ func (s *HybridStorage) WithMachineID(string) Storage {
 }
 
 // suppose Visible()==true
-func compareNode(a *DBRecord, b *DBRecord) int {
+func compareNode(a *DBRecord, b *DBRecord, machineID string) int {
 	if a == nil && b == nil {
 		return 0
 	}
@@ -199,9 +199,9 @@ func compareNode(a *DBRecord, b *DBRecord) int {
 	if b == nil {
 		return -1
 	}
-	if a.CurrentMachineChanges > b.CurrentMachineChanges {
+	if a.Changes(machineID) > b.Changes(machineID) {
 		return 1
-	} else if a.CurrentMachineChanges < b.CurrentMachineChanges {
+	} else if a.Changes(machineID) < b.Changes(machineID) {
 		return -1
 	} else {
 		if a.MachineID > b.MachineID {
@@ -215,10 +215,10 @@ func compareNode(a *DBRecord, b *DBRecord) int {
 	}
 }
 
-func findMain(a []*DBRecord) *DBRecord {
+func findMain(a []*DBRecord, machineID string) *DBRecord {
 	var maxRecord *DBRecord
 	for _, record := range a {
-		if compareNode(record, maxRecord) > 0 {
+		if compareNode(record, maxRecord, machineID) > 0 {
 			maxRecord = record
 		}
 	}
@@ -248,20 +248,20 @@ func (s *HybridStorage) Save(key string, value string) error {
 		}
 
 		return s.f.AddLeaf(&DBRecord{
-			Key:                   key,
-			Value:                 value,
-			MachineID:             s.machineID,
-			PrevMachineID:         "",
-			Seq:                   0,
-			CurrentLogGid:         gid,
-			PrevLogGid:            "",
-			IsDiscarded:           false,
-			IsDeleted:             false,
-			CurrentMachineChanges: 1,
+			Key:                key,
+			Value:              value,
+			MachineID:          s.machineID,
+			PrevMachineID:      "",
+			Seq:                0,
+			CurrentLogGid:      gid,
+			PrevLogGid:         "",
+			IsDiscarded:        false,
+			IsDeleted:          false,
+			MachineChangeCount: map[string]int32{s.machineID: 1},
 		}, false)
 	}
 
-	main := findMain(leaves)
+	main := findMain(leaves, s.machineID)
 	if main == nil {
 		return fmt.Errorf("cannot find main node")
 	}
@@ -281,16 +281,16 @@ func (s *HybridStorage) Save(key string, value string) error {
 		return err
 	}
 	return s.f.AddLeaf(&DBRecord{
-		Key:                   key,
-		Value:                 value,
-		MachineID:             s.machineID,
-		PrevMachineID:         main.PrevMachineID,
-		Seq:                   main.Seq + 1,
-		CurrentLogGid:         gid,
-		PrevLogGid:            main.CurrentLogGid,
-		IsDiscarded:           false,
-		IsDeleted:             false,
-		CurrentMachineChanges: main.CurrentMachineChanges + 1,
+		Key:                key,
+		Value:              value,
+		MachineID:          s.machineID,
+		PrevMachineID:      main.PrevMachineID,
+		Seq:                main.Seq + 1,
+		CurrentLogGid:      gid,
+		PrevLogGid:         main.CurrentLogGid,
+		IsDiscarded:        false,
+		IsDeleted:          false,
+		MachineChangeCount: main.AddChange(s.machineID, 1),
 	}, false)
 }
 
@@ -302,7 +302,7 @@ func (s *HybridStorage) Del(key string) error {
 	if len(leaves) == 0 {
 		return nil
 	}
-	main := findMain(leaves)
+	main := findMain(leaves, s.machineID)
 	if main == nil {
 		return fmt.Errorf("cannot find main node")
 	}
@@ -321,15 +321,15 @@ func (s *HybridStorage) Del(key string) error {
 		return err
 	}
 	return s.f.AddLeaf(&DBRecord{
-		Key:                   key,
-		MachineID:             s.machineID,
-		PrevMachineID:         main.PrevMachineID,
-		Seq:                   main.Seq + 1,
-		CurrentLogGid:         gid,
-		PrevLogGid:            main.CurrentLogGid,
-		IsDiscarded:           false,
-		IsDeleted:             true,
-		CurrentMachineChanges: main.CurrentMachineChanges + 1,
+		Key:                key,
+		MachineID:          s.machineID,
+		PrevMachineID:      main.PrevMachineID,
+		Seq:                main.Seq + 1,
+		CurrentLogGid:      gid,
+		PrevLogGid:         main.CurrentLogGid,
+		IsDiscarded:        false,
+		IsDeleted:          true,
+		MachineChangeCount: main.AddChange(s.machineID, 1),
 	}, false)
 }
 
@@ -338,7 +338,7 @@ func (s *HybridStorage) Has(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return findMain(leaves) != nil, nil
+	return findMain(leaves, s.machineID) != nil, nil
 }
 
 func (s *HybridStorage) Load(key string) (string, error) {
@@ -350,7 +350,7 @@ func (s *HybridStorage) Load(key string) (string, error) {
 		return "", fmt.Errorf("not exist")
 	}
 
-	main := findMain(leaves)
+	main := findMain(leaves, s.machineID)
 	if main == nil {
 		return "", fmt.Errorf("cannot find main node")
 	}
@@ -373,7 +373,7 @@ func (s *HybridStorage) All() ([][2]string, error) {
 			m[l.Key] = e
 
 		} else {
-			if compareNode(l, e) > 0 {
+			if compareNode(l, e, s.machineID) > 0 {
 				m[l.Key] = e
 			}
 		}
