@@ -185,6 +185,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		logger.Error("get leaves[%v] failed[%v]", logOp.Key, err)
 		return false
 	}
+	leavesOfKey = filterVisible(leavesOfKey)
 	var parent *DBRecord = nil
 	isSmallOrEqual := true
 	for _, leaf := range leavesOfKey {

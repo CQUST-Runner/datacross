@@ -18,7 +18,7 @@ func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridSto
 	}
 
 	s := HybridStorage{}
-	err = s.Init(&wal)
+	err = s.Init(&wal, "machine0")
 	if err != nil {
 		return nil, err
 	}
@@ -199,23 +199,23 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	dbFile := getDBFile(t)
 	walFile := getWalFile()
 
-	w := Wal{}
-	err := w.Init(walFile, &JsonLog{}, false)
-	assert.Nil(t, err)
 	const testKey = "testKey"
 	const testValue = "testValue"
-	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "1", Value: testValue + "1"})
+	s, err := createHybridStorage(dbFile, walFile, &JsonLog{})
 	assert.Nil(t, err)
-	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "2", Value: testValue + "2"})
-	assert.Nil(t, err)
-	_, err = w.Append(&LogOperation{Op: int32(Op_Modify), Key: testKey + "3", Value: testValue + "3"})
-	assert.Nil(t, err)
-	_, err = w.Append(&LogOperation{Op: int32(Op_Del), Key: testKey + "2", Value: ""})
-	assert.Nil(t, err)
-	err = w.Close()
+	err = s.Save(testKey+"1", testValue+"1")
 	assert.Nil(t, err)
 
-	s, err := createHybridStorage(dbFile, walFile, &JsonLog{})
+	err = s.Save(testKey+"2", testValue+"2")
+	assert.Nil(t, err)
+	err = s.Save(testKey+"3", testValue+"3")
+	assert.Nil(t, err)
+	err = s.Del(testKey + "2")
+
+	assert.Nil(t, err)
+	s.Close()
+
+	s, err = createHybridStorage(dbFile, walFile, &JsonLog{})
 	assert.Nil(t, err)
 	defer s.Close()
 	records, err := s.All()

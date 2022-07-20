@@ -75,9 +75,7 @@ func (n *NodeStorageImpl) GetByKey(key string) ([]*DBRecord, error) {
 	records := make([]*DBRecord, elements.Len())
 	for e := elements.Front(); e != nil; e = e.Next() {
 		record := e.Value.(*list.Element).Value.(*DBRecord)
-		if record.Visible() {
-			records = append(records, record)
-		}
+		records = append(records, record)
 	}
 	return records, nil
 }
@@ -121,7 +119,7 @@ func (n *NodeStorageImpl) Del(gid string) error {
 }
 
 func (n *NodeStorageImpl) AllNodes() ([]*DBRecord, error) {
-	results := make([]*DBRecord, n.l.Len())
+	results := make([]*DBRecord, 0, n.l.Len())
 	for e := n.l.Front(); e != nil; e = e.Next() {
 		results = append(results, e.Value.(*DBRecord))
 	}

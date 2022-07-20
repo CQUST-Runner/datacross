@@ -352,6 +352,10 @@ func (w *Wal) Iterator() *WalIterator {
 func (w *Wal) IteratorFrom(start string, inclusive bool) (*WalIterator, error) {
 	i := WalIterator{}
 	i.Init(w)
+	if len(start) == 0 {
+		return &i, nil
+	}
+
 	found := false
 	for i.Next() {
 		if i.LogOp().Gid == start {

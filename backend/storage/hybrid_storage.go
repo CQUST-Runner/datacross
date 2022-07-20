@@ -166,12 +166,24 @@ type HybridStorage struct {
 	w         *Wal
 }
 
-func (s *HybridStorage) Init(w *Wal) error {
+func (s *HybridStorage) Init(w *Wal, machineID string) error {
 	n := NodeStorageImpl{}
 	n.Init()
 	f := GrowOnlyForestImpl{}
 	f.Init(&n)
 
+	r := LogRunner{}
+	if err := r.Init(machineID, &n); err != nil {
+		return err
+	}
+
+	result, err := r.Run(&LogInput{w: w, machineID: machineID, start: ""})
+	if err != nil {
+		return err
+	}
+	_ = result
+
+	s.machineID = machineID
 	s.w = w
 	s.f = &f
 	return nil
@@ -230,6 +242,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 	if err != nil {
 		return err
 	}
+	leaves = filterVisible(leaves)
 
 	if len(leaves) == 0 {
 		gid, err := s.w.Append(&LogOperation{
@@ -301,6 +314,7 @@ func (s *HybridStorage) Del(key string) error {
 	if err != nil {
 		return err
 	}
+	leaves = filterVisible(leaves)
 	if len(leaves) == 0 {
 		return nil
 	}
@@ -341,7 +355,19 @@ func (s *HybridStorage) Has(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	leaves = filterVisible(leaves)
+
 	return findMain(leaves, s.machineID) != nil, nil
+}
+
+func filterVisible(a []*DBRecord) []*DBRecord {
+	results := make([]*DBRecord, 0, len(a))
+	for _, record := range a {
+		if record != nil && record.Visible() {
+			results = append(results, record)
+		}
+	}
+	return results
 }
 
 func (s *HybridStorage) Load(key string) (string, error) {
@@ -349,6 +375,7 @@ func (s *HybridStorage) Load(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	leaves = filterVisible(leaves)
 	if len(leaves) == 0 {
 		return "", fmt.Errorf("not exist")
 	}
