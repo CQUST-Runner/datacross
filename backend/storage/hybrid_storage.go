@@ -242,6 +242,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 			Seq:           0,
 			MachineId:     s.machineID,
 			PrevMachineId: "",
+			Changes:       map[string]int32{s.machineID: 1},
 		})
 		if err != nil {
 			return err
@@ -276,6 +277,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 		Seq:           main.Seq + 1,
 		MachineId:     s.machineID,
 		PrevMachineId: main.MachineID,
+		Changes:       main.AddChange(s.machineID, 1),
 	})
 	if err != nil {
 		return err
@@ -316,6 +318,7 @@ func (s *HybridStorage) Del(key string) error {
 		Seq:           main.Seq + 1,
 		MachineId:     s.machineID,
 		PrevMachineId: main.MachineID,
+		Changes:       main.AddChange(s.machineID, 1),
 	})
 	if err != nil {
 		return err
