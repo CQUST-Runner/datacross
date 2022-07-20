@@ -194,10 +194,10 @@ func compareNode(a *DBRecord, b *DBRecord, machineID string) int {
 		return 0
 	}
 	if a == nil {
-		return 1
+		return -1
 	}
 	if b == nil {
-		return -1
+		return 1
 	}
 	if a.Changes(machineID) > b.Changes(machineID) {
 		return 1
@@ -373,8 +373,7 @@ func (s *HybridStorage) All() ([][2]string, error) {
 		}
 		e, ok := m[l.Key]
 		if !ok {
-			m[l.Key] = e
-
+			m[l.Key] = l
 		} else {
 			if compareNode(l, e, s.machineID) > 0 {
 				m[l.Key] = e
