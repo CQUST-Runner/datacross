@@ -10,7 +10,6 @@ import (
 
 const fileName = "test.db"
 const tableName = "test"
-const machineName = "machine0"
 
 func getDB(t assert.TestingT) *SqliteAdapter {
 	_, err := os.Stat(fileName)
@@ -19,7 +18,7 @@ func getDB(t assert.TestingT) *SqliteAdapter {
 		assert.Nil(t, err)
 	}
 	a := SqliteAdapter{}
-	err = a.Init(fileName, tableName, machineName)
+	err = a.Init(fileName, tableName)
 	assert.Nil(t, err)
 	return &a
 }
@@ -170,16 +169,6 @@ func TestAll(t *testing.T) {
 	assert.Equal(t, valuePrefix+"2", m[key2])
 }
 
-func TestLastCommit(t *testing.T) {
-	t.Cleanup(delDBFile)
-	a := getDB(t)
-	defer a.Close()
-
-	id, err := a.LastCommit()
-	assert.Nil(t, err)
-	assert.Equal(t, "", id)
-}
-
 func TestLastSync(t *testing.T) {
 	t.Cleanup(delDBFile)
 	a := getDB(t)
@@ -291,46 +280,4 @@ func TestRollbackInnerTransaction(t *testing.T) {
 	has, err = a.Has(testKey + "2")
 	assert.Nil(t, err)
 	assert.False(t, has)
-}
-
-func TestMachineID(t *testing.T) {
-	t.Cleanup(delDBFile)
-	a := getDB(t)
-	defer a.Close()
-
-	const testKey = "testKey"
-	const testValue = "testValue"
-	const machinePrefix = "machine"
-
-	err := a.WithMachineID(machinePrefix+"1").Save(testKey+"1", testValue+"1")
-	assert.Nil(t, err)
-	err = a.WithMachineID(machinePrefix+"2").Save(testKey+"2", testValue+"2")
-	assert.Nil(t, err)
-	err = a.WithMachineID(machinePrefix+"3").Save(testKey+"3", testValue+"3")
-	assert.Nil(t, err)
-
-	records, err := a.WithMachineID(machinePrefix + "1").All()
-	assert.Nil(t, err)
-	assert.Equal(t, int(1), len(records))
-	assert.Equal(t, [2]string{testKey + "1", testValue + "1"}, records[0])
-
-	records, err = a.WithMachineID(machinePrefix + "2").All()
-	assert.Nil(t, err)
-	assert.Equal(t, int(1), len(records))
-	assert.Equal(t, [2]string{testKey + "2", testValue + "2"}, records[0])
-
-	records, err = a.WithMachineID(machinePrefix + "3").All()
-	assert.Nil(t, err)
-	assert.Equal(t, int(1), len(records))
-	assert.Equal(t, [2]string{testKey + "3", testValue + "3"}, records[0])
-
-	err = a.WithMachineID(machinePrefix + "2").Del(testKey + "2")
-	assert.Nil(t, err)
-
-	records, err = a.WithMachineID("").All()
-	assert.Nil(t, err)
-	assert.Equal(t, int(2), len(records))
-	assert.ElementsMatch(t,
-		[][2]string{{testKey + "1", testValue + "1"}, {testKey + "3", testValue + "3"}},
-		records)
 }

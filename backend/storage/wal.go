@@ -209,9 +209,9 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, error) {
 func execLogEntry(logOp *LogOperation, s Storage) error {
 	switch logOp.Op {
 	case int32(Op_Del):
-		return s.WithCommitID(logOp.Gid).Del(logOp.Key)
+		return s.Del(logOp.Key)
 	case int32(Op_Modify):
-		return s.WithCommitID(logOp.Gid).Save(logOp.Key, logOp.Value)
+		return s.Save(logOp.Key, logOp.Value)
 	case int32(Op_Discard):
 		return fmt.Errorf("unsupported op[%v]", logOp.Op)
 	case int32(Op_None):

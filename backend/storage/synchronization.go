@@ -2,8 +2,6 @@ package storage
 
 import (
 	"fmt"
-
-	gogoproto "github.com/gogo/protobuf/proto"
 )
 
 type SyncContext struct {
@@ -37,7 +35,7 @@ func (c *SyncContext) Init(info *NetworkInfo, pname string) (err error) {
 
 	// TODO open for readonly?
 	sqlite := SqliteAdapter{}
-	err = sqlite.Init(dbFilePath, "", pname)
+	err = sqlite.Init(dbFilePath, "")
 	if err != nil {
 		return err
 	}
@@ -77,91 +75,6 @@ func (c *SyncContext) Close() {
 		}
 		c.sqlite = nil
 	}
-}
-
-type Patch struct {
-}
-
-func (p *Patch) Merge(p2 *Patch) error {
-	return nil
-}
-
-func isLeading(w *Wal, id1 string, id2 string) (bool, error) {
-	if len(id1) == 0 {
-		return false, nil
-	}
-	if len(id2) == 0 {
-		return true, nil
-	}
-	num := 1
-	id1Num := 0
-	id2Num := 0
-	err := w.Foreach(func(logOp *LogOperation) bool {
-		if logOp.Gid == id1 {
-			id1Num = num
-		} else if logOp.Gid == id2 {
-			id2Num = num
-		}
-		num++
-		return id1Num == 0 || id2Num == 0
-	})
-	if err != nil {
-		return false, err
-	}
-	return id1Num > id2Num, nil
-}
-
-type CondenserLogOperation2 struct {
-	LogOperation
-	MachineID string
-}
-
-type LogCondenser2 struct {
-	m map[string][]*CondenserLogOperation2
-}
-
-func (c *LogCondenser2) Init() {
-	c.m = make(map[string][]*CondenserLogOperation2)
-}
-
-func (c *LogCondenser2) Append(logOp *CondenserLogOperation2) {
-
-	arr, ok := c.m[logOp.Key]
-	if !ok {
-		c.m[logOp.Key] = append(c.m[logOp.Key], logOp)
-		return
-	}
-
-	for i, e := range arr {
-		if e.MachineID == logOp.MachineID {
-			arr[i] = logOp
-			return
-		}
-	}
-
-	c.m[logOp.Key] = append(c.m[logOp.Key], logOp)
-}
-
-// TODO save entry num in file header
-func condenseLog(c *SyncContext, start string, end string, condenser *LogCondenser2) error {
-	ops := []*LogOperation{}
-	err := c.w.Range(start, end, func(logOp *LogOperation) bool {
-		ops = append(ops, logOp)
-		return true
-	})
-	if err != nil {
-		return err
-	}
-	for _, logOp := range ops {
-		if logOp == nil {
-			continue
-		}
-
-		logOp2 := CondenserLogOperation2{MachineID: c.machineID}
-		logOp2.LogOperation = *gogoproto.Clone(logOp).(*LogOperation)
-		condenser.Append(&CondenserLogOperation2{})
-	}
-	return nil
 }
 
 func doSync(self string, info *NetworkInfo) error {
