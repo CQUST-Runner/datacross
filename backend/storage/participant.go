@@ -36,7 +36,7 @@ func discoveryAllParticipants(wd string) ([]string, error) {
 		if !e.IsDir() {
 			continue
 		}
-		sign := path.Join(path.Join(wd, e.Name()), DBFileName)
+		sign := path.Join(path.Join(wd, e.Name()), WalFileName)
 		if IsFile(sign) {
 			list = append(list, e.Name())
 		}
@@ -96,11 +96,6 @@ func (p *Participant) Init(wd string, name string) (err error) {
 		}
 	}
 
-	all, err := discoveryAllParticipants(wd)
-	if err != nil {
-		return err
-	}
-
 	wal := Wal{}
 	err = wal.Init(walFile, &BinLog{}, false)
 	if err != nil {
@@ -113,6 +108,10 @@ func (p *Participant) Init(wd string, name string) (err error) {
 		return err
 	}
 
+	all, err := discoveryAllParticipants(wd)
+	if err != nil {
+		return err
+	}
 	p.info = &NetworkInfo{wd: wd, participants: all}
 	p.name = name
 	p.personalPath = personalPath

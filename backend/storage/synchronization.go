@@ -103,6 +103,7 @@ func doSync(p *Participant, info *NetworkInfo) error {
 	}
 
 	s := NodeStorageImpl{}
+	s.Init()
 	runner := LogRunner{}
 	if err := runner.Init(p.name, &s); err != nil {
 		return err
