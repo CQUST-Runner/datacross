@@ -35,6 +35,7 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 			IsDiscarded:        record.IsDiscarded,
 			IsDeleted:          record.IsDeleted,
 			MachineChangeCount: record.MachineChangeCount,
+			Num:                record.Num,
 		})
 	}
 
@@ -55,6 +56,8 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 			IsDiscarded:        record.IsDiscarded,
 			IsDeleted:          record.IsDeleted,
 			MachineChangeCount: record.MachineChangeCount,
+			Num:                record.Num,
+			PrevNum:            parent.PrevNum,
 		})
 	} else {
 		if force {
@@ -68,6 +71,8 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 				IsDiscarded:        record.IsDiscarded,
 				IsDeleted:          record.IsDeleted,
 				MachineChangeCount: record.MachineChangeCount,
+				Num:                record.Num,
+				PrevNum:            record.PrevNum,
 			})
 		} else {
 			return fmt.Errorf("cannot find parent node")

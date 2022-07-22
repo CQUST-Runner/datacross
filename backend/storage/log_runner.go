@@ -169,6 +169,8 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
 			MachineChangeCount: map[string]int32{logOp.MachineId: 1},
+			Num:                logOp.Num,
+			PrevNum:            logOp.PrevNum,
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)
@@ -209,6 +211,8 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
 			MachineChangeCount: parent.AddChange(logOp.MachineId, 1),
+			Num:                logOp.Num,
+			PrevNum:            logOp.PrevNum,
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(parent, &record)
@@ -232,6 +236,8 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
 			MachineChangeCount: logOp.Changes,
+			Num:                logOp.Num,
+			PrevNum:            logOp.PrevNum,
 		}
 		// TODO handle error
 		c.changeList.UpdateChangeList(nil, &record)

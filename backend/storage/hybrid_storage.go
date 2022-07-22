@@ -88,7 +88,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 	leaves = filterVisible(leaves)
 
 	if len(leaves) == 0 {
-		gid, err := s.w.Append(&LogOperation{
+		gid, num, err := s.w.Append(&LogOperation{
 			Op:            int32(Op_Modify),
 			Key:           key,
 			Value:         value,
@@ -99,6 +99,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 			MachineId:     s.machineID,
 			PrevMachineId: "",
 			Changes:       map[string]int32{s.machineID: 1},
+			PrevNum:       0,
 		})
 		if err != nil {
 			return err
@@ -115,6 +116,8 @@ func (s *HybridStorage) Save(key string, value string) error {
 			IsDiscarded:        false,
 			IsDeleted:          false,
 			MachineChangeCount: map[string]int32{s.machineID: 1},
+			Num:                num,
+			PrevNum:            0,
 		}, false)
 	}
 
@@ -123,7 +126,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	gid, err := s.w.Append(&LogOperation{
+	gid, num, err := s.w.Append(&LogOperation{
 		Op:            int32(Op_Modify),
 		Key:           key,
 		Value:         value,
@@ -134,6 +137,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 		MachineId:     s.machineID,
 		PrevMachineId: main.MachineID,
 		Changes:       main.AddChange(s.machineID, 1),
+		PrevNum:       main.Num,
 	})
 	if err != nil {
 		return err
@@ -149,6 +153,8 @@ func (s *HybridStorage) Save(key string, value string) error {
 		IsDiscarded:        false,
 		IsDeleted:          false,
 		MachineChangeCount: main.AddChange(s.machineID, 1),
+		Num:                num,
+		PrevNum:            main.PrevNum,
 	}, false)
 }
 
@@ -166,7 +172,7 @@ func (s *HybridStorage) Del(key string) error {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	gid, err := s.w.Append(&LogOperation{
+	gid, num, err := s.w.Append(&LogOperation{
 		Op:            int32(Op_Del),
 		Key:           key,
 		Gid:           "",
@@ -176,6 +182,7 @@ func (s *HybridStorage) Del(key string) error {
 		MachineId:     s.machineID,
 		PrevMachineId: main.MachineID,
 		Changes:       main.AddChange(s.machineID, 1),
+		PrevNum:       main.Num,
 	})
 	if err != nil {
 		return err
@@ -190,6 +197,8 @@ func (s *HybridStorage) Del(key string) error {
 		IsDiscarded:        false,
 		IsDeleted:          true,
 		MachineChangeCount: main.AddChange(s.machineID, 1),
+		Num:                num,
+		PrevNum:            main.PrevNum,
 	}, false)
 }
 

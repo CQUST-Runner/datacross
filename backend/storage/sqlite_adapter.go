@@ -44,6 +44,8 @@ type DBRecord struct {
 	IsDeleted     bool   `gorm:"column:is_deleted"`
 	// TODO: 日志填写changes字段
 	MachineChangeCount ChangeCount
+	Num                int64 `gorm:"num"`
+	PrevNum            int64 `gorm:"prev_num"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	DeletedAt          sql.NullTime `gorm:"index"`

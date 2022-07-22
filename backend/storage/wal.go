@@ -118,7 +118,7 @@ func (w *Wal) Init(filename string, l LogFormat, readonly bool) error {
 		if err != nil {
 			return err
 		}
-		header = &FileHeader{Id: id, FileEnd: HeaderSize}
+		header = &FileHeader{Id: id, FileEnd: HeaderSize, EntryNum: 0}
 		err = l.WriteHeader(f, header)
 		if err != nil {
 			return err
@@ -158,15 +158,15 @@ func (w *Wal) Close() error {
 
 // Append multiple operations will be appended as a single log entry
 // returns the gid of the last operation
-func (w *Wal) Append(logOp ...*LogOperation) (string, error) {
+func (w *Wal) Append(logOp ...*LogOperation) (string, int64, error) {
 	if w.broken {
-		return "", fmt.Errorf("wal is broken")
+		return "", 0, fmt.Errorf("wal is broken")
 	}
 	if w.readonly {
-		return "", fmt.Errorf("append to readonly file")
+		return "", 0, fmt.Errorf("append to readonly file")
 	}
 	if len(logOp) == 0 {
-		return "", fmt.Errorf("empty input")
+		return "", 0, fmt.Errorf("empty input")
 	}
 
 	gids := make([]string, len(logOp))
@@ -174,20 +174,21 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, error) {
 
 		gid, err := GenUUID()
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 		gids[i] = gid
 	}
 	for i := range logOp {
 		logOp[i].Gid = gids[i]
+		logOp[i].Num = w.header.EntryNum + int64(i) + 1
 	}
 	lastGid := gids[len(gids)-1]
 
 	err := w.AppendRaw(logOp...)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
-	return lastGid, nil
+	return lastGid, w.header.EntryNum + int64(len(logOp)), nil
 }
 
 func (w *Wal) AppendRaw(logOp ...*LogOperation) error {
@@ -213,6 +214,7 @@ func (w *Wal) AppendRaw(logOp ...*LogOperation) error {
 	newHeader := gogoproto.Clone(w.header).(*FileHeader)
 	newHeader.FileEnd = newPos
 	newHeader.LastEntryId = logOp[len(logOp)-1].Gid
+	newHeader.EntryNum += int64(len(logOp))
 	err = w.l.WriteHeader(w.f, newHeader)
 	// This should not be happen
 	if err != nil {
