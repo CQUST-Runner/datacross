@@ -58,15 +58,21 @@ func compareNode(a *DBRecord, b *DBRecord, machineID string) int {
 		return 1
 	} else if a.Changes(machineID) < b.Changes(machineID) {
 		return -1
+	}
+
+	if a.Seq > b.Seq {
+		return 1
+	} else if a.Seq < b.Seq {
+		return -1
+	}
+
+	if a.MachineID > b.MachineID {
+		return 1
+	} else if a.MachineID < b.MachineID {
+		return -1
 	} else {
-		if a.MachineID > b.MachineID {
-			return 1
-		} else if a.MachineID < b.MachineID {
-			return -1
-		} else {
-			// should not be
-			return 0
-		}
+		// should not be
+		return 0
 	}
 }
 
@@ -239,8 +245,6 @@ func (s *HybridStorage) Load(key string) (string, error) {
 	return main.Value, nil
 }
 
-// TODO findMain有问题
-// TODO run log时本机引用其他机器的日志
 func (s *HybridStorage) All() ([][2]string, error) {
 	leaves, err := s.f.AllLeaves()
 	if err != nil {
@@ -257,10 +261,9 @@ func (s *HybridStorage) All() ([][2]string, error) {
 			m[l.Key] = l
 		} else {
 			if compareNode(l, e, s.machineID) > 0 {
-				m[l.Key] = e
+				m[l.Key] = l
 			}
 		}
-
 	}
 
 	results := make([][2]string, 0)
