@@ -285,7 +285,7 @@ func TestRandomOperationsAndRecovery(t *testing.T) {
 	assert.Nil(t, err)
 	actual := map[string]string{}
 	for _, tuple := range records {
-		actual[tuple[0]] = tuple[1]
+		actual[tuple.key] = tuple.value
 	}
 	assert.EqualValues(t, expected, actual)
 

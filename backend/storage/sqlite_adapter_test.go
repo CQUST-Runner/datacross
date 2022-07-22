@@ -156,9 +156,7 @@ func TestAll(t *testing.T) {
 	assert.Nil(t, err)
 	m := map[string]string{}
 	for _, rec := range records {
-		if len(rec) >= 2 {
-			m[rec[0]] = rec[1]
-		}
+		m[rec.key] = rec.value
 	}
 
 	_, ok := m[key1]

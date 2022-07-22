@@ -79,18 +79,18 @@ func (s *mapWrapper) Has(key string) (bool, error) {
 	return ok, nil
 }
 
-func (s *mapWrapper) Load(key string) (string, error) {
+func (s *mapWrapper) Load(key string) (*Value, error) {
 	val, ok := s.m[key]
 	if ok {
-		return val, nil
+		return &Value{key: key, value: val}, nil
 	}
-	return "", fmt.Errorf("not exist")
+	return nil, fmt.Errorf("not exist")
 }
 
-func (s *mapWrapper) All() ([][2]string, error) {
-	records := [][2]string{}
+func (s *mapWrapper) All() ([]*Value, error) {
+	records := []*Value{}
 	for k, v := range s.m {
-		records = append(records, [2]string{k, v})
+		records = append(records, &Value{key: k, value: v})
 	}
 	return records, nil
 }

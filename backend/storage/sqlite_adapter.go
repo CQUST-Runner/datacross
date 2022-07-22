@@ -216,16 +216,16 @@ func (s *SqliteAdapter) Has(key string) (bool, error) {
 	return result.RowsAffected > 0, nil
 }
 
-func (s *SqliteAdapter) Load(key string) (string, error) {
+func (s *SqliteAdapter) Load(key string) (*Value, error) {
 	rec := DBRecord{}
 	result := s.workingDB.Where("key = ?", key).First(&rec)
 	if result.Error != nil {
-		return "", result.Error
+		return nil, result.Error
 	}
-	return rec.Value, nil
+	return &Value{key: key, value: rec.Value}, nil
 }
 
-func (s *SqliteAdapter) All() ([][2]string, error) {
+func (s *SqliteAdapter) All() ([]*Value, error) {
 	records := []DBRecord{}
 	var result *gorm.DB
 	result = s.workingDB.Find(&records)
@@ -233,12 +233,12 @@ func (s *SqliteAdapter) All() ([][2]string, error) {
 		return nil, result.Error
 	}
 
-	kvs := [][2]string{}
+	kvs := []*Value{}
 	for _, rec := range records {
 		if rec.Key == _last_sync_key {
 			continue
 		}
-		kvs = append(kvs, [2]string{rec.Key, rec.Value})
+		kvs = append(kvs, &Value{key: rec.Key, value: rec.Value})
 	}
 	return kvs, nil
 }

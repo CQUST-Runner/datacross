@@ -226,24 +226,24 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 	return results
 }
 
-func (s *HybridStorage) Load(key string) (string, error) {
+func (s *HybridStorage) Load(key string) (*Value, error) {
 	leaves, err := s.f.GetByKey(key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	leaves = filterVisible(leaves)
 	if len(leaves) == 0 {
-		return "", fmt.Errorf("not exist")
+		return nil, fmt.Errorf("not exist")
 	}
 
 	main := findMain(leaves, s.machineID)
 	if main == nil {
-		return "", fmt.Errorf("cannot find main node")
+		return nil, fmt.Errorf("cannot find main node")
 	}
-	return main.Value, nil
+	return &Value{key: key, value: main.Value}, nil
 }
 
-func (s *HybridStorage) All() ([][2]string, error) {
+func (s *HybridStorage) All() ([]*Value, error) {
 	leaves, err := s.f.AllNodes()
 	if err != nil {
 		return nil, err
@@ -264,9 +264,9 @@ func (s *HybridStorage) All() ([][2]string, error) {
 		}
 	}
 
-	results := make([][2]string, 0)
+	results := make([]*Value, 0)
 	for _, l := range m {
-		results = append(results, [2]string{l.Key, l.Value})
+		results = append(results, &Value{key: l.Key, value: l.Value})
 	}
 	return results, nil
 }
