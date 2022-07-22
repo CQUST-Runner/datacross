@@ -111,7 +111,7 @@ func doSync(p *Participant, info *NetworkInfo) error {
 
 	inputs := []*LogInput{}
 	for _, v := range m {
-		inputs = append(inputs, &LogInput{w: v.w, machineID: v.machineID, start: ""})
+		inputs = append(inputs, &LogInput{w: v.w, machineID: v.machineID, start: "", startNum: 0})
 	}
 	_, err := runner.Run(inputs...)
 	if err != nil {

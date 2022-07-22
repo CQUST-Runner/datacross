@@ -9,6 +9,7 @@ type LogInput struct {
 	machineID string
 	w         *Wal
 	start     string
+	startNum  int64
 }
 
 type ChangeList struct {
@@ -114,6 +115,7 @@ func (r *RunLogResult) Error() error {
 type RunLogWorker struct {
 	input     *LogInput
 	position  string
+	process   int64
 	err       error
 	pendingOp *LogOperation
 	it        *WalIterator
@@ -141,10 +143,18 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 		c.workers[input.machineID] = &RunLogWorker{
 			input:    input,
 			position: input.start,
+			process:  input.startNum,
 			it:       it,
 		}
 	}
 	return nil
+}
+
+func (c *RunLogContext) Progress(machineID string) int64 {
+	if w, ok := c.workers[machineID]; ok {
+		return w.process
+	}
+	return 0
 }
 
 type LogRunner struct {
@@ -159,7 +169,7 @@ func (r *LogRunner) Init(machineID string, s NodeStorage) error {
 }
 
 func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
-	if logOp.Seq == 0 {
+	if logOp.PrevNum == 0 {
 		record := DBRecord{
 			Key:                logOp.Key,
 			Value:              logOp.Value,
@@ -182,22 +192,13 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		return true
 	}
 
-	leavesOfKey, err := r.s.GetByKey(logOp.Key)
-	if err != nil {
-		logger.Error("get leaves[%v] failed[%v]", logOp.Key, err)
+	if logOp.PrevNum > c.Progress(logOp.PrevMachineId) {
 		return false
 	}
-	leavesOfKey = filterVisible(leavesOfKey)
-	var parent *DBRecord = nil
-	isSmallOrEqual := true
-	for _, leaf := range leavesOfKey {
-		if logOp.Seq == leaf.Seq+1 && logOp.PrevGid == leaf.CurrentLogGid {
-			parent = leaf
-			break
-		}
-		if logOp.Seq > leaf.Seq {
-			isSmallOrEqual = false
-		}
+
+	parent, err := r.s.GetByGid(logOp.PrevGid)
+	if err != nil {
+		return false
 	}
 	if parent != nil {
 		record := DBRecord{
@@ -210,7 +211,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 			PrevLogGid:         parent.CurrentLogGid,
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
-			MachineChangeCount: parent.AddChange(logOp.MachineId, 1),
+			MachineChangeCount: logOp.Changes,
 			Num:                logOp.Num,
 			PrevNum:            logOp.PrevNum,
 		}
@@ -224,32 +225,28 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		return true
 	}
 
-	if isSmallOrEqual && logOp.PrevMachineId == r.machineID {
-		record := DBRecord{
-			Key:                logOp.Key,
-			Value:              logOp.Value,
-			MachineID:          logOp.MachineId,
-			PrevMachineID:      logOp.PrevMachineId,
-			Seq:                logOp.Seq,
-			CurrentLogGid:      logOp.Gid,
-			PrevLogGid:         logOp.PrevGid,
-			IsDeleted:          logOp.Op == int32(Op_Del),
-			IsDiscarded:        logOp.Op == int32(Op_Discard),
-			MachineChangeCount: logOp.Changes,
-			Num:                logOp.Num,
-			PrevNum:            logOp.PrevNum,
-		}
-		// TODO handle error
-		c.changeList.UpdateChangeList(nil, &record)
-		err := r.s.Add(&record)
-		if err != nil {
-			logger.Error("add leaf of key[%v] [%v] failed", record.Key, record.CurrentLogGid)
-			return false
-		}
-		return true
+	record := DBRecord{
+		Key:                logOp.Key,
+		Value:              logOp.Value,
+		MachineID:          logOp.MachineId,
+		PrevMachineID:      logOp.PrevMachineId,
+		Seq:                logOp.Seq,
+		CurrentLogGid:      logOp.Gid,
+		PrevLogGid:         logOp.PrevGid,
+		IsDeleted:          logOp.Op == int32(Op_Del),
+		IsDiscarded:        logOp.Op == int32(Op_Discard),
+		MachineChangeCount: logOp.Changes,
+		Num:                logOp.Num,
+		PrevNum:            logOp.PrevNum,
 	}
-
-	return false
+	// TODO handle error
+	c.changeList.UpdateChangeList(nil, &record)
+	err = r.s.Add(&record)
+	if err != nil {
+		logger.Error("add leaf of key[%v] [%v] failed", record.Key, record.CurrentLogGid)
+		return false
+	}
+	return true
 }
 
 func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
@@ -260,6 +257,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 			return false
 		}
 		worker.position = worker.pendingOp.Gid
+		worker.process = worker.pendingOp.Num
 		worker.pendingOp = nil
 		count++
 	}
@@ -271,6 +269,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 			return count > 0
 		}
 		worker.position = logOp.Gid
+		worker.process = logOp.Num
 		count++
 	}
 	return count > 0

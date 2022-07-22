@@ -20,7 +20,7 @@ func (s *HybridStorage) Init(w *Wal, machineID string) error {
 		return err
 	}
 
-	result, err := r.Run(&LogInput{w: w, machineID: machineID, start: ""})
+	result, err := r.Run(&LogInput{w: w, machineID: machineID, start: "", startNum: 0})
 	if err != nil {
 		return err
 	}
