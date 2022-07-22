@@ -117,8 +117,6 @@ func doSync(p *Participant, info *NetworkInfo) error {
 	if err != nil {
 		return err
 	}
-	f := GrowOnlyForestImpl{}
-	f.Init(&s)
-	p.s.f = &f
+	p.s.f = &s
 	return nil
 }

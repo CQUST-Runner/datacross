@@ -4,19 +4,17 @@ import "fmt"
 
 // HybridStorage ...
 type HybridStorage struct {
-	f         GrowOnlyForest
+	f         NodeStorage
 	machineID string
 	w         *Wal
 }
 
 func (s *HybridStorage) Init(w *Wal, machineID string) error {
-	n := NodeStorageImpl{}
-	n.Init()
-	f := GrowOnlyForestImpl{}
-	f.Init(&n)
+	f := NodeStorageImpl{}
+	f.Init()
 
 	r := LogRunner{}
-	if err := r.Init(machineID, &n); err != nil {
+	if err := r.Init(machineID, &f); err != nil {
 		return err
 	}
 
@@ -87,7 +85,7 @@ func findMain(a []*DBRecord, machineID string) *DBRecord {
 }
 
 func (s *HybridStorage) Save(key string, value string) error {
-	leaves, err := s.f.GetLeavesByKey(key)
+	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return err
 	}
@@ -111,7 +109,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 			return err
 		}
 
-		return s.f.AddLeaf(&DBRecord{
+		return s.f.Add(&DBRecord{
 			Key:                key,
 			Value:              value,
 			MachineID:          s.machineID,
@@ -124,7 +122,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 			MachineChangeCount: map[string]int32{s.machineID: 1},
 			Num:                num,
 			PrevNum:            0,
-		}, false)
+		})
 	}
 
 	main := findMain(leaves, s.machineID)
@@ -148,7 +146,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 	if err != nil {
 		return err
 	}
-	return s.f.AddLeaf(&DBRecord{
+	return s.f.Replace(main.CurrentLogGid, &DBRecord{
 		Key:                key,
 		Value:              value,
 		MachineID:          s.machineID,
@@ -161,11 +159,11 @@ func (s *HybridStorage) Save(key string, value string) error {
 		MachineChangeCount: main.AddChange(s.machineID, 1),
 		Num:                num,
 		PrevNum:            main.Num,
-	}, false)
+	})
 }
 
 func (s *HybridStorage) Del(key string) error {
-	leaves, err := s.f.GetLeavesByKey(key)
+	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return err
 	}
@@ -193,7 +191,7 @@ func (s *HybridStorage) Del(key string) error {
 	if err != nil {
 		return err
 	}
-	return s.f.AddLeaf(&DBRecord{
+	return s.f.Replace(main.CurrentLogGid, &DBRecord{
 		Key:                key,
 		MachineID:          s.machineID,
 		PrevMachineID:      main.PrevMachineID,
@@ -205,11 +203,11 @@ func (s *HybridStorage) Del(key string) error {
 		MachineChangeCount: main.AddChange(s.machineID, 1),
 		Num:                num,
 		PrevNum:            main.Num,
-	}, false)
+	})
 }
 
 func (s *HybridStorage) Has(key string) (bool, error) {
-	leaves, err := s.f.GetLeavesByKey(key)
+	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return false, err
 	}
@@ -229,7 +227,7 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 }
 
 func (s *HybridStorage) Load(key string) (string, error) {
-	leaves, err := s.f.GetLeavesByKey(key)
+	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return "", err
 	}
@@ -246,7 +244,7 @@ func (s *HybridStorage) Load(key string) (string, error) {
 }
 
 func (s *HybridStorage) All() ([][2]string, error) {
-	leaves, err := s.f.AllLeaves()
+	leaves, err := s.f.AllNodes()
 	if err != nil {
 		return nil, err
 	}
