@@ -13,6 +13,8 @@ type Value struct {
 
 func (v *Value) String() string {
 	sb := strings.Builder{}
+	sb.WriteString(v.key)
+	sb.WriteString(": ")
 	sb.WriteString(v.value)
 	nonEmpty := false
 	for _, b := range v.branches {
