@@ -57,7 +57,7 @@ func (f *GrowOnlyForestImpl) AddLeaf(record *DBRecord, force bool) error {
 			IsDeleted:          record.IsDeleted,
 			MachineChangeCount: record.MachineChangeCount,
 			Num:                record.Num,
-			PrevNum:            parent.PrevNum,
+			PrevNum:            record.PrevNum,
 		})
 	} else {
 		if force {

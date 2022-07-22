@@ -178,6 +178,7 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, int64, error) {
 		}
 		gids[i] = gid
 	}
+	lastNum := w.header.EntryNum + int64(len(logOp))
 	for i := range logOp {
 		logOp[i].Gid = gids[i]
 		logOp[i].Num = w.header.EntryNum + int64(i) + 1
@@ -188,7 +189,8 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, int64, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	return lastGid, w.header.EntryNum + int64(len(logOp)), nil
+
+	return lastGid, lastNum, nil
 }
 
 func (w *Wal) AppendRaw(logOp ...*LogOperation) error {

@@ -154,7 +154,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 		IsDeleted:          false,
 		MachineChangeCount: main.AddChange(s.machineID, 1),
 		Num:                num,
-		PrevNum:            main.PrevNum,
+		PrevNum:            main.Num,
 	}, false)
 }
 
@@ -198,7 +198,7 @@ func (s *HybridStorage) Del(key string) error {
 		IsDeleted:          true,
 		MachineChangeCount: main.AddChange(s.machineID, 1),
 		Num:                num,
-		PrevNum:            main.PrevNum,
+		PrevNum:            main.Num,
 	}, false)
 }
 
