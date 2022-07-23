@@ -64,6 +64,8 @@ func (v *Value) Main() *ValueVersion {
 
 func (v *Value) String() string {
 	sb := strings.Builder{}
+	sb.WriteString(v.Main().key)
+	sb.WriteString(": ")
 	sb.WriteString(v.Main().value)
 	nonEmpty := false
 	for _, b := range v.Branches() {
