@@ -1,6 +1,9 @@
 package storage
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type Value struct {
 	key       string
@@ -9,6 +12,35 @@ type Value struct {
 	gid       string
 	seq       int
 	branches  []*Value
+}
+
+func (v *Value) from(leaves []*DBRecord, machineID string) error {
+	main := findMain(leaves, machineID)
+	if main == nil {
+		return fmt.Errorf("cannot find main node")
+	}
+
+	v.key = main.Key
+	v.value = main.Value
+	v.gid = main.CurrentLogGid
+	v.machineID = main.MachineID
+	v.seq = 0
+
+	seq := 1
+	for _, e := range leaves {
+		if e == nil {
+			continue
+		}
+		if e.CurrentLogGid == main.CurrentLogGid {
+			continue
+		}
+		v.branches = append(v.branches,
+			&Value{key: e.Key, value: e.Value,
+				machineID: e.MachineID, gid: e.CurrentLogGid,
+				seq: seq})
+		seq++
+	}
+	return nil
 }
 
 func (v *Value) String() string {

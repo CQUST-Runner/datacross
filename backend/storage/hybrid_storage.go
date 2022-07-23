@@ -236,22 +236,10 @@ func (s *HybridStorage) Load(key string) (*Value, error) {
 		return nil, fmt.Errorf("not exist")
 	}
 
-	main := findMain(leaves, s.machineID)
-	if main == nil {
-		return nil, fmt.Errorf("cannot find main node")
-	}
-	v := Value{key: key, value: main.Value, machineID: main.MachineID,
-		gid: main.CurrentLogGid, seq: 0}
-	seq := 1
-	for _, e := range leaves {
-		if e == nil {
-			continue
-		}
-		if e.CurrentLogGid == main.CurrentLogGid {
-			continue
-		}
-		v.branches = append(v.branches, &Value{key: key, value: e.Value, machineID: e.MachineID, gid: e.CurrentLogGid, seq: seq})
-		seq++
+	v := Value{}
+	err = v.from(leaves, s.machineID)
+	if err != nil {
+		return nil, err
 	}
 	return &v, nil
 }
@@ -267,40 +255,17 @@ func (s *HybridStorage) All() ([]*Value, error) {
 		if l == nil || !l.Visible() {
 			continue
 		}
-		e, ok := m[l.Key]
-		if !ok {
-			m[l.Key] = append(m[l.Key], l)
-		} else {
-			e0 := e[0]
-			if compareNode(l, e0, s.machineID) > 0 {
-				m[l.Key][0] = l
-				m[l.Key] = append(m[l.Key], e0)
-			} else {
-				m[l.Key] = append(m[l.Key], l)
-			}
-		}
+		m[l.Key] = append(m[l.Key], l)
 	}
 
 	results := make([]*Value, 0)
 	for _, l := range m {
-		var v *Value
-		seq := 1
-		for i, e := range l {
-			if e == nil {
-				continue
-			}
-			if i == 0 {
-				v = &Value{key: e.Key, value: e.Value, machineID: e.MachineID, gid: e.CurrentLogGid, seq: 0}
-			} else {
-				v.branches = append(v.branches, &Value{
-					key: e.Key, value: e.Value,
-					machineID: e.MachineID, gid: e.CurrentLogGid,
-					seq: seq,
-				})
-				seq++
-			}
+		v := Value{}
+		err := v.from(l, s.machineID)
+		if err != nil {
+			return nil, err
 		}
-		results = append(results, v)
+		results = append(results, &v)
 	}
 	return results, nil
 }
