@@ -84,14 +84,14 @@ func TestLoad(t *testing.T) {
 
 	val, err := a.Load(key)
 	assert.Nil(t, err)
-	assert.Equal(t, valuePrefix+"1", val)
+	assert.Equal(t, valuePrefix+"1", val.Main().value)
 
 	err = a.Save(key, valuePrefix+"2")
 	assert.Nil(t, err)
 
 	val, err = a.Load(key)
 	assert.Nil(t, err)
-	assert.Equal(t, valuePrefix+"2", val)
+	assert.Equal(t, valuePrefix+"2", val.Main().value)
 }
 
 func TestHas(t *testing.T) {

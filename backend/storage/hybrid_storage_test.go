@@ -59,13 +59,13 @@ func TestHybridStorageSave(t *testing.T) {
 
 	v, err := s.Load(testKey + "1")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"1", v)
+	assert.Equal(t, testValue+"1", v.Main().value)
 	v, err = s.Load(testKey + "2")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"2", v)
+	assert.Equal(t, testValue+"2", v.Main().value)
 	v, err = s.Load(testKey + "3")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"3", v)
+	assert.Equal(t, testValue+"3", v.Main().value)
 	_, err = s.Load(testKey + "4")
 	assert.NotNil(t, err)
 }
@@ -92,13 +92,13 @@ func TestHybridStorageDel(t *testing.T) {
 
 	v, err := s.Load(testKey + "1")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"1", v)
+	assert.Equal(t, testValue+"1", v.Main().value)
 	v, err = s.Load(testKey + "2")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"2", v)
+	assert.Equal(t, testValue+"2", v.Main().value)
 	v, err = s.Load(testKey + "3")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"3", v)
+	assert.Equal(t, testValue+"3", v.Main().value)
 	_, err = s.Load(testKey + "4")
 	assert.NotNil(t, err)
 
@@ -130,13 +130,13 @@ func TestHybridStorageHas(t *testing.T) {
 
 	v, err := s.Load(testKey + "1")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"1", v)
+	assert.Equal(t, testValue+"1", v.Main().value)
 	v, err = s.Load(testKey + "2")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"2", v)
+	assert.Equal(t, testValue+"2", v.Main().value)
 	v, err = s.Load(testKey + "3")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"3", v)
+	assert.Equal(t, testValue+"3", v.Main().value)
 	_, err = s.Load(testKey + "4")
 	assert.NotNil(t, err)
 
@@ -171,13 +171,13 @@ func TestHybridStorageAll(t *testing.T) {
 
 	v, err := s.Load(testKey + "1")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"1", v)
+	assert.Equal(t, testValue+"1", v.Main().value)
 	v, err = s.Load(testKey + "2")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"2", v)
+	assert.Equal(t, testValue+"2", v.Main().value)
 	v, err = s.Load(testKey + "3")
 	assert.Nil(t, err)
-	assert.Equal(t, testValue+"3", v)
+	assert.Equal(t, testValue+"3", v.Main().value)
 	_, err = s.Load(testKey + "4")
 	assert.NotNil(t, err)
 
@@ -186,7 +186,7 @@ func TestHybridStorageAll(t *testing.T) {
 	expected := [][2]string{{testKey + "1", testValue + "1"},
 		{testKey + "2", testValue + "2"},
 		{testKey + "3", testValue + "3"}}
-	assert.ElementsMatch(t, expected, records)
+	assert.ElementsMatch(t, expected, valuesToArray(records))
 }
 
 func TestHybridStorageRecoverDB(t *testing.T) {
@@ -222,7 +222,7 @@ func TestHybridStorageRecoverDB(t *testing.T) {
 	assert.Nil(t, err)
 	expected := [][2]string{{testKey + "1", testValue + "1"},
 		{testKey + "3", testValue + "3"}}
-	assert.ElementsMatch(t, expected, records)
+	assert.ElementsMatch(t, expected, valuesToArray(records))
 }
 
 func getFileSize(filename string) (int64, error) {

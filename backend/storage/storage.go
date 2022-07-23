@@ -86,6 +86,17 @@ func (v *Value) String() string {
 	return sb.String()
 }
 
+func valuesToArray(v []*Value) [][2]string {
+	results := [][2]string{}
+	for _, vv := range v {
+		if vv == nil {
+			continue
+		}
+		results = append(results, [2]string{vv.Main().key, vv.Main().value})
+	}
+	return results
+}
+
 // Storage ...
 type Storage interface {
 	Save(key string, value string) error
