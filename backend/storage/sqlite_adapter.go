@@ -251,6 +251,10 @@ func (s *SqliteAdapter) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }
 
+func (s *SqliteAdapter) Accept(v *Value, seq int) error {
+	return fmt.Errorf("unsupported")
+}
+
 func _() {
 	var _ Storage = &SqliteAdapter{}
 }

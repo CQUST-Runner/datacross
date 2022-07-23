@@ -13,6 +13,10 @@ type ValueVersion struct {
 	seq       int
 }
 
+func (v *ValueVersion) String() string {
+	return fmt.Sprintf("%v\t%v\t%v\t%v", v.key, v.value, v.machineID, v.seq)
+}
+
 type Value struct {
 	versions []*ValueVersion
 }
@@ -52,6 +56,10 @@ func (v *Value) from(leaves []*DBRecord, machineID string) error {
 		seq++
 	}
 	return nil
+}
+
+func (v *Value) ValidSeq(seq int) bool {
+	return seq < len(v.versions)
 }
 
 func (v *Value) Branches() []*ValueVersion {
@@ -108,4 +116,5 @@ type Storage interface {
 	All() ([]*Value, error)
 	// Merge merges s into self, for duplicate keys, our side take precedence
 	Merge(s Storage) error
+	Accept(v *Value, seq int) error
 }

@@ -270,6 +270,65 @@ func (s *HybridStorage) All() ([]*Value, error) {
 	return results, nil
 }
 
+func (s *HybridStorage) discard(gid string) error {
+	record, err := s.f.GetByGid(gid)
+	if err != nil {
+		return err
+	}
+
+	gid, num, err := s.w.Append(&LogOperation{
+		Op:            int32(Op_Discard),
+		Key:           record.Key,
+		PrevGid:       record.CurrentLogGid,
+		PrevValue:     record.Value,
+		Seq:           record.Seq + 1,
+		MachineId:     s.machineID,
+		PrevMachineId: record.MachineID,
+		Changes:       record.AddChange(s.machineID, 1),
+		PrevNum:       record.Num,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = s.f.Replace(gid, &DBRecord{
+		Key:                record.Key,
+		MachineID:          s.machineID,
+		PrevMachineID:      record.MachineID,
+		Seq:                record.Seq + 1,
+		CurrentLogGid:      gid,
+		PrevLogGid:         record.CurrentLogGid,
+		IsDiscarded:        true,
+		IsDeleted:          false,
+		MachineChangeCount: record.AddChange(s.machineID, 1),
+		Num:                num,
+		PrevNum:            record.Num,
+	})
+	return err
+}
+
+func (s *HybridStorage) Accept(v *Value, seq int) error {
+	if len(v.Branches()) == 0 {
+		return fmt.Errorf("key is not in conflict state")
+	}
+	if !v.ValidSeq(seq) {
+		return fmt.Errorf("seq is invalid")
+	}
+
+	for _, version := range v.versions {
+		if version == nil {
+			continue
+		}
+		if version.seq != seq {
+			err := s.discard(version.gid)
+			if err != nil {
+				logger.Warn("discard version failed, seq[%v] gid[%v]", version.seq, version.gid)
+			}
+		}
+	}
+	return nil
+}
+
 func (s *HybridStorage) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }

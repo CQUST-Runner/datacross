@@ -124,6 +124,48 @@ func has(w io.Writer, args ...string) {
 	fmt.Println(has)
 }
 
+func resolve(w io.Writer, args ...string) {
+	if len(args) < 1 {
+		fmt.Fprintln(w, "too few args, usage: resolve <key>")
+		return
+	}
+
+	key := args[0]
+	v, err := p.S().Load(key)
+	if err != nil {
+		fmt.Fprintf(w, "load key failed[%v]\n", err)
+		return
+	}
+
+	if len(v.Branches()) == 0 {
+		fmt.Fprintf(w, "key is not in conflict state, no action needed\n")
+		return
+	}
+
+	for _, version := range v.Branches() {
+		fmt.Fprintln(w, version)
+	}
+
+	fmt.Fprint(w, "enter seq num to accept(the num in the last column): ")
+	var seq int
+	_, err = fmt.Scan(&seq)
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
+	if !v.ValidSeq(seq) {
+		fmt.Fprintf(w, "error, invalid seq[%v]\n", seq)
+		return
+	}
+
+	err = p.S().Accept(v, seq)
+	if err != nil {
+		fmt.Fprintln(w, "error, ", err)
+		return
+	}
+	fmt.Fprintln(w, "ok")
+}
+
 func help(w io.Writer, args ...string) {
 	fmt.Fprintln(w, `
 list
@@ -131,6 +173,7 @@ get <key>
 del <key>
 has <key>
 set <key> <value>
+resolve <key>
 help
 exit
 	`)
@@ -160,6 +203,8 @@ func exec(w io.Writer, cmd string) {
 		has(w, tokens[1:]...)
 	case "set":
 		set(w, tokens[1:]...)
+	case "resolve":
+		resolve(w, tokens[1:]...)
 	case "help":
 		help(w, tokens[1:]...)
 	default:
