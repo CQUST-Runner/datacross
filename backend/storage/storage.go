@@ -62,6 +62,10 @@ func (v *Value) ValidSeq(seq int) bool {
 	return seq < len(v.versions)
 }
 
+func (v *Value) Versions() []*ValueVersion {
+	return v.versions
+}
+
 func (v *Value) Branches() []*ValueVersion {
 	return v.versions[1:]
 }

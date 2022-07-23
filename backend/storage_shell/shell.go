@@ -142,7 +142,7 @@ func resolve(w io.Writer, args ...string) {
 		return
 	}
 
-	for _, version := range v.Branches() {
+	for _, version := range v.Versions() {
 		fmt.Fprintln(w, version)
 	}
 
