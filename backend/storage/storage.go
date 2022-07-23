@@ -5,13 +5,25 @@ import (
 	"strings"
 )
 
-type Value struct {
+type ValueVersion struct {
 	key       string
 	value     string
 	machineID string
 	gid       string
 	seq       int
-	branches  []*Value
+}
+
+type Value struct {
+	versions []*ValueVersion
+}
+
+func (v *Value) setMain(key string, value string) {
+	main := ValueVersion{key: key, value: value, seq: 0}
+	if len(v.versions) > 0 {
+		v.versions[0] = &main
+	} else {
+		v.versions = append(v.versions, &main)
+	}
 }
 
 func (v *Value) from(leaves []*DBRecord, machineID string) error {
@@ -20,11 +32,10 @@ func (v *Value) from(leaves []*DBRecord, machineID string) error {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	v.key = main.Key
-	v.value = main.Value
-	v.gid = main.CurrentLogGid
-	v.machineID = main.MachineID
-	v.seq = 0
+	v.versions = append(v.versions,
+		&ValueVersion{key: main.Key, value: main.Value,
+			gid: main.CurrentLogGid, machineID: main.MachineID,
+			seq: 0})
 
 	seq := 1
 	for _, e := range leaves {
@@ -34,8 +45,8 @@ func (v *Value) from(leaves []*DBRecord, machineID string) error {
 		if e.CurrentLogGid == main.CurrentLogGid {
 			continue
 		}
-		v.branches = append(v.branches,
-			&Value{key: e.Key, value: e.Value,
+		v.versions = append(v.versions,
+			&ValueVersion{key: e.Key, value: e.Value,
 				machineID: e.MachineID, gid: e.CurrentLogGid,
 				seq: seq})
 		seq++
@@ -43,11 +54,19 @@ func (v *Value) from(leaves []*DBRecord, machineID string) error {
 	return nil
 }
 
+func (v *Value) Branches() []*ValueVersion {
+	return v.versions[1:]
+}
+
+func (v *Value) Main() *ValueVersion {
+	return v.versions[0]
+}
+
 func (v *Value) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(v.value)
+	sb.WriteString(v.Main().value)
 	nonEmpty := false
-	for _, b := range v.branches {
+	for _, b := range v.Branches() {
 		if b != nil {
 			nonEmpty = true
 			break
@@ -57,7 +76,7 @@ func (v *Value) String() string {
 		sb.WriteString("(*)")
 	}
 
-	for _, b := range v.branches {
+	for _, b := range v.Branches() {
 		if b == nil {
 			continue
 		}

@@ -222,7 +222,9 @@ func (s *SqliteAdapter) Load(key string) (*Value, error) {
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return &Value{key: key, value: rec.Value}, nil
+	v := Value{}
+	v.setMain(key, rec.Value)
+	return &v, nil
 }
 
 func (s *SqliteAdapter) All() ([]*Value, error) {
@@ -238,7 +240,9 @@ func (s *SqliteAdapter) All() ([]*Value, error) {
 		if rec.Key == _last_sync_key {
 			continue
 		}
-		kvs = append(kvs, &Value{key: rec.Key, value: rec.Value})
+		v := Value{}
+		v.setMain(rec.Key, rec.Value)
+		kvs = append(kvs, &v)
 	}
 	return kvs, nil
 }

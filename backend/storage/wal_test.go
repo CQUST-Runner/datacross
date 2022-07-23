@@ -82,7 +82,9 @@ func (s *mapWrapper) Has(key string) (bool, error) {
 func (s *mapWrapper) Load(key string) (*Value, error) {
 	val, ok := s.m[key]
 	if ok {
-		return &Value{key: key, value: val}, nil
+		v := Value{}
+		v.setMain(key, val)
+		return &v, nil
 	}
 	return nil, fmt.Errorf("not exist")
 }
@@ -90,7 +92,9 @@ func (s *mapWrapper) Load(key string) (*Value, error) {
 func (s *mapWrapper) All() ([]*Value, error) {
 	records := []*Value{}
 	for k, v := range s.m {
-		records = append(records, &Value{key: k, value: v})
+		value := Value{}
+		value.setMain(k, v)
+		records = append(records, &value)
 	}
 	return records, nil
 }

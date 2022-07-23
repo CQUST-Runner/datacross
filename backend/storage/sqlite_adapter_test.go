@@ -156,7 +156,7 @@ func TestAll(t *testing.T) {
 	assert.Nil(t, err)
 	m := map[string]string{}
 	for _, rec := range records {
-		m[rec.key] = rec.value
+		m[rec.Main().key] = rec.Main().value
 	}
 
 	_, ok := m[key1]
