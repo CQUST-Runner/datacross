@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -38,7 +37,7 @@ type DBRecord struct {
 	MachineID     string `gorm:"column:machine_id"`
 	PrevMachineID string `gorm:"column:prev_machine_id"`
 	Seq           uint64 `gorm:"column:seq"`
-	CurrentLogGid string `gorm:"column:current_log_gid"`
+	CurrentLogGid string `gorm:"column:gid"`
 	PrevLogGid    string `gorm:"column:prev_log_gid"`
 	IsDiscarded   bool   `gorm:"column:is_discarded"`
 	IsDeleted     bool   `gorm:"column:is_deleted"`
@@ -80,74 +79,12 @@ func (r *DBRecord) AddChange(machineID string, changes int32) map[string]int32 {
 	return m
 }
 
-type SyncStatus struct {
-	Pos       map[string]string
-	Time      time.Time
-	MachineID string
-}
-
-func (s *SyncStatus) Position(name string) string {
-	position, ok := s.Pos[name]
-	if !ok {
-		return ""
-	}
-	return position
-}
-
-func (s *SyncStatus) Merge(other *SyncStatus) {
-	for id, pos := range other.Pos {
-		s.Pos[id] = pos
-	}
-	s.Time = other.Time
-}
-
 // SqliteAdapter ...
 type SqliteAdapter struct {
 	db        *gorm.DB
 	tableName string
 
 	workingDB *gorm.DB
-}
-
-const _last_sync_key = "_last_sync"
-
-func (s *SqliteAdapter) LastSync() (*SyncStatus, error) {
-	rec := DBRecord{}
-	result := s.workingDB.Where("machine_id = ? AND key = ?", "", _last_sync_key).First(&rec)
-	jDoc, err := rec.Value, result.Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return &SyncStatus{Pos: make(map[string]string)}, nil
-		}
-		return nil, err
-	}
-
-	status := SyncStatus{}
-	err = json.Unmarshal([]byte(jDoc), &status)
-	if err != nil {
-		return nil, err
-	}
-	return &status, nil
-}
-
-// TODO do not modify oldStatus
-func (s *SqliteAdapter) SaveLastSync(oldStatus *SyncStatus, newStatus *SyncStatus) error {
-	if oldStatus.Pos == nil {
-		oldStatus.Pos = make(map[string]string)
-	}
-	if newStatus.Pos == nil {
-		newStatus.Pos = make(map[string]string)
-	}
-
-	for k, pos := range newStatus.Pos {
-		oldStatus.Pos[k] = pos
-	}
-	oldStatus.Time = time.Now()
-	jDoc, err := json.Marshal(oldStatus)
-	if err != nil {
-		return err
-	}
-	return s.workingDB.Where("machine_id = ? AND key = ?", "", _last_sync_key).Save(&DBRecord{Key: _last_sync_key, Value: string(jDoc), MachineID: ""}).Error
 }
 
 func (s *SqliteAdapter) Transaction(f func(s *SqliteAdapter) error) error {
@@ -191,24 +128,13 @@ func (s *SqliteAdapter) Close() error {
 	return nil
 }
 
-func (s *SqliteAdapter) Save(key string, value string) error {
-	if has, err := s.Has(key); has || err != nil {
-		return s.workingDB.Model(&DBRecord{}).Omit("machine_id").Where("key = ?", key).Updates(&DBRecord{Key: key, Value: value}).Error
-	} else {
-		return s.workingDB.Create(&DBRecord{Key: key, Value: value}).Error
-	}
-}
-
 //TODO: whether to have soft deletion enabled
 //TODO: create index
-func (s *SqliteAdapter) Del(key string) error {
-	return s.workingDB.Where("key = ?", key).Delete(&DBRecord{Key: key}).Error
-}
 
-func (s *SqliteAdapter) Has(key string) (bool, error) {
+func (s *SqliteAdapter) Has(gid string) (bool, error) {
 	recs := []DBRecord{}
 	var result *gorm.DB
-	result = s.workingDB.Find(&recs, "key = ?", key)
+	result = s.workingDB.Find(&recs, "gid = ?", gid)
 	if result.Error != nil {
 		return false, result.Error
 	}
@@ -216,45 +142,69 @@ func (s *SqliteAdapter) Has(key string) (bool, error) {
 	return result.RowsAffected > 0, nil
 }
 
-func (s *SqliteAdapter) Load(key string) (*Value, error) {
-	rec := DBRecord{}
-	result := s.workingDB.Where("key = ?", key).First(&rec)
+func (s *SqliteAdapter) Add(record *DBRecord) error {
+	if has, err := s.Has(record.CurrentLogGid); has || err != nil {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("node exists")
+	} else {
+		return s.workingDB.Create(record).Error
+	}
+}
+
+func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
+	has, err := s.Has(old)
+	if err != nil {
+		return err
+	}
+	if !has {
+		return fmt.Errorf("node not exist")
+	}
+	return s.Transaction(func(s *SqliteAdapter) error {
+		if err := s.Del(old); err != nil {
+			return err
+		}
+		return s.workingDB.Create(new).Error
+	})
+}
+
+func (s *SqliteAdapter) Del(gid string) error {
+	return s.workingDB.Where("gid = ?", gid).Delete(&DBRecord{CurrentLogGid: gid}).Error
+}
+
+func (s *SqliteAdapter) GetByKey(key string) ([]*DBRecord, error) {
+
+	records := []*DBRecord{}
+	var result *gorm.DB
+	result = s.workingDB.Where("key = ?", key).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	v := Value{}
-	v.setMain(key, rec.Value)
-	return &v, nil
+	return records, nil
 }
 
-func (s *SqliteAdapter) All() ([]*Value, error) {
-	records := []DBRecord{}
+func (s *SqliteAdapter) GetByGid(gid string) (*DBRecord, error) {
+	rec := DBRecord{}
+	result := s.workingDB.Where("gid = ?", gid).First(&rec)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &rec, nil
+}
+
+func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
+
+	records := []*DBRecord{}
 	var result *gorm.DB
 	result = s.workingDB.Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-
-	kvs := []*Value{}
-	for _, rec := range records {
-		if rec.Key == _last_sync_key {
-			continue
-		}
-		v := Value{}
-		v.setMain(rec.Key, rec.Value)
-		kvs = append(kvs, &v)
-	}
-	return kvs, nil
-}
-
-func (s *SqliteAdapter) Merge(Storage) error {
-	return fmt.Errorf("unsupported")
-}
-
-func (s *SqliteAdapter) Accept(v *Value, seq int) error {
-	return fmt.Errorf("unsupported")
+	return records, nil
 }
 
 func _() {
-	var _ Storage = &SqliteAdapter{}
+	// var _ Storage = &SqliteAdapter{}
+	var _ NodeStorage = &SqliteAdapter{}
 }
