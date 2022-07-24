@@ -232,6 +232,10 @@ func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 	return records, nil
 }
 
+func (s *SqliteAdapter) Merge(other ReadOnlyNodeStorage) error {
+	return fmt.Errorf("unsupported")
+}
+
 func _() {
 	var _ NodeStorage = &SqliteAdapter{}
 }

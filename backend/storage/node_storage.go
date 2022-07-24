@@ -15,6 +15,7 @@ type NodeStorage interface {
 	ReadOnlyNodeStorage
 	Add(record *DBRecord) error
 	Replace(old string, new *DBRecord) error
+	Merge(other ReadOnlyNodeStorage) error
 }
 
 type NodeStorageImpl struct {
@@ -25,6 +26,10 @@ type NodeStorageImpl struct {
 }
 
 func (n *NodeStorageImpl) Init() {
+	n.clear()
+}
+
+func (n *NodeStorageImpl) clear() {
 	n.l = list.New()
 	n.keyIndex = make(map[string]*list.List)
 	n.gidIndex = make(map[string]*list.Element)
@@ -112,7 +117,7 @@ func (n *NodeStorageImpl) Replace(old string, new *DBRecord) error {
 	return nil
 }
 
-func (n *NodeStorageImpl) Del(gid string) error {
+func (n *NodeStorageImpl) del(gid string) error {
 	e := n.getByGidInternal(gid)
 	if e == nil {
 		return nil
@@ -127,4 +132,19 @@ func (n *NodeStorageImpl) AllNodes() ([]*DBRecord, error) {
 		results = append(results, e.Value.(*DBRecord))
 	}
 	return results, nil
+}
+
+func (n *NodeStorageImpl) Merge(other ReadOnlyNodeStorage) error {
+	all, err := other.AllNodes()
+	if err != nil {
+		return err
+	}
+
+	for _, node := range all {
+		if node == nil {
+			continue
+		}
+		_ = n.Add(node)
+	}
+	return nil
 }
