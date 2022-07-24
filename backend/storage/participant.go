@@ -7,6 +7,60 @@ import (
 	"time"
 )
 
+type ParticipantInfo struct {
+	name string
+
+	personalPath string
+	walFile      string
+	dbFile       string
+
+	network *NetworkInfo2
+}
+
+func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo2) {
+	personalPath := getPersonalPath(wd, name)
+	walPath := getWalFilePath(personalPath)
+	dbPath := getDBFilePath(personalPath)
+
+	p.name = name
+	p.personalPath = personalPath
+	p.walFile = walPath
+	p.dbFile = dbPath
+	p.network = n
+}
+
+type NetworkInfo2 struct {
+	wd           string
+	participants map[string]*ParticipantInfo
+}
+
+func (n *NetworkInfo2) Init(wd string) error {
+	all, err := discoveryAllParticipants(wd)
+	if err != nil {
+		return err
+	}
+	participants := map[string]*ParticipantInfo{}
+	for _, name := range all {
+		p := ParticipantInfo{}
+		p.Init(wd, name, n)
+		participants[name] = &p
+	}
+
+	n.wd = wd
+	n.participants = participants
+
+	return nil
+}
+
+func (n *NetworkInfo2) Add(name string) *ParticipantInfo {
+	if _, ok := n.participants[name]; !ok {
+		p := ParticipantInfo{}
+		p.Init(n.wd, name, n)
+		n.participants[name] = &p
+	}
+	return n.participants[name]
+}
+
 type NetworkInfo struct {
 	wd           string
 	participants []string
@@ -103,7 +157,7 @@ func (p *Participant) Init(wd string, name string) (err error) {
 	}
 
 	s := HybridStorage{}
-	err = s.Init(&wal, name)
+	err = s.Init(wd, name)
 	if err != nil {
 		return err
 	}

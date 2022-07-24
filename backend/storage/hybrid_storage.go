@@ -1,32 +1,123 @@
 package storage
 
-import "fmt"
+import (
+	"fmt"
+)
+
+type LogProcess struct {
+	offset int64
+	gid    string
+	num    int64
+}
+
+type LogProcessMgr struct {
+	m map[string]*LogProcess
+}
+
+func (m *LogProcessMgr) Init() {
+	m.m = make(map[string]*LogProcess)
+}
+
+func (m *LogProcessMgr) Get(machineID string) *LogProcess {
+	if p, ok := m.m[machineID]; ok {
+		return p
+	}
+	p := LogProcess{}
+	m.m[machineID] = &p
+	return &p
+}
+
+func (m *LogProcessMgr) Set(machineID string, process *LogProcess) {
+	m.m[machineID] = process
+}
 
 // HybridStorage ...
 type HybridStorage struct {
+	network *NetworkInfo2
+	m       *LogProcessMgr
+	me      *ParticipantInfo
+
+	w         *WalHelper
 	f         NodeStorage
 	machineID string
-	w         *Wal
 }
 
-func (s *HybridStorage) Init(w *Wal, machineID string) error {
-	f := NodeStorageImpl{}
-	f.Init()
+func (s *HybridStorage) runLogInputs() (inputs []*LogInput, retErr error) {
+	inputs = []*LogInput{}
+	for _, p := range s.network.participants {
+		var process LogProcess = *s.m.Get(p.name)
+		w := Wal{}
+		err := w.Init(p.walFile, &BinLog{}, true)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if retErr != nil {
+				err := w.Close()
+				if err != nil {
+					logger.Error("close wal file failed", err)
+				}
+			}
+		}()
 
-	r := LogRunner{}
-	if err := r.Init(machineID, &f); err != nil {
-		return err
+		inputs = append(inputs, &LogInput{
+			machineID: p.name, w: &w,
+			process: &process})
 	}
+	return inputs, nil
+}
 
-	result, err := r.Run(&LogInput{w: w, machineID: machineID, start: "", startNum: 0})
+func (s *HybridStorage) runLog() error {
+	runner := LogRunner{}
+	err := runner.Init(s.machineID, s.f)
 	if err != nil {
 		return err
 	}
-	_ = result
 
+	inputs, err := s.runLogInputs()
+	if err != nil {
+		return err
+	}
+	// TODO inputs.Close
+
+	results, err := runner.Run(inputs...)
+	if err != nil {
+		return err
+	}
+
+	for machineID, process := range results.status {
+		s.m.Set(machineID, process)
+	}
+
+	return nil
+}
+
+func (s *HybridStorage) Init(wd string, machineID string) error {
+
+	network := NetworkInfo2{}
+	err := network.Init(wd)
+	if err != nil {
+		return err
+	}
+
+	me := network.Add(machineID)
+
+	m := LogProcessMgr{}
+	m.Init()
+
+	ns := NodeStorageImpl{}
+	ns.Init()
+
+	w := WalHelper{}
+	w.Init(me.walFile, &BinLog{}, 1)
+
+	s.network = &network
+	s.m = &m
+	s.f = &ns
 	s.machineID = machineID
-	s.w = w
-	s.f = &f
+	s.w = &w
+	s.me = me
+
 	return nil
 }
 
@@ -39,49 +130,6 @@ func (s *HybridStorage) WithCommitID(string) Storage {
 
 func (s *HybridStorage) WithMachineID(string) Storage {
 	return s
-}
-
-// suppose Visible()==true
-func compareNode(a *DBRecord, b *DBRecord, machineID string) int {
-	if a == nil && b == nil {
-		return 0
-	}
-	if a == nil {
-		return -1
-	}
-	if b == nil {
-		return 1
-	}
-	if a.Changes(machineID) > b.Changes(machineID) {
-		return 1
-	} else if a.Changes(machineID) < b.Changes(machineID) {
-		return -1
-	}
-
-	if a.Seq > b.Seq {
-		return 1
-	} else if a.Seq < b.Seq {
-		return -1
-	}
-
-	if a.MachineID > b.MachineID {
-		return 1
-	} else if a.MachineID < b.MachineID {
-		return -1
-	} else {
-		// should not be
-		return 0
-	}
-}
-
-func findMain(a []*DBRecord, machineID string) *DBRecord {
-	var maxRecord *DBRecord
-	for _, record := range a {
-		if compareNode(record, maxRecord, machineID) > 0 {
-			maxRecord = record
-		}
-	}
-	return maxRecord
 }
 
 func (s *HybridStorage) Save(key string, value string) error {

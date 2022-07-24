@@ -30,6 +30,16 @@ func (i *WalIterator) Init(w *Wal) {
 	i.index = 0
 }
 
+func (i *WalIterator) InitWithOffset(w *Wal, offset int64) {
+	if offset < HeaderSize {
+		offset = HeaderSize
+	}
+	i.w = w
+	i.pos = offset
+	i.entry = nil
+	i.index = 0
+}
+
 func (i *WalIterator) Next() (hasNext bool) {
 	if i.stoped {
 		return false
@@ -87,6 +97,10 @@ func (i *WalIterator) LogOp() *LogOperation {
 		panic("error state")
 	}
 	return i.entry.Ops[i.index]
+}
+
+func (i *WalIterator) Offset() int64 {
+	return i.pos
 }
 
 type Wal struct {
@@ -154,6 +168,10 @@ func (w *Wal) Close() error {
 	w.l = nil
 	w.pos = 0
 	return nil
+}
+
+func (w *Wal) Offset() int64 {
+	return w.header.FileEnd
 }
 
 // Append multiple operations will be appended as a single log entry
@@ -369,6 +387,12 @@ func (w *Wal) Range(start string, end string, do func(logOp *LogOperation) bool)
 func (w *Wal) Iterator() *WalIterator {
 	i := WalIterator{}
 	i.Init(w)
+	return &i
+}
+
+func (w *Wal) IteratorOffset(offset int64) *WalIterator {
+	i := WalIterator{}
+	i.InitWithOffset(w, offset)
 	return &i
 }
 

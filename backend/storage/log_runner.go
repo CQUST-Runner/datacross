@@ -8,8 +8,7 @@ import (
 type LogInput struct {
 	machineID string
 	w         *Wal
-	start     string
-	startNum  int64
+	process   *LogProcess
 }
 
 type ChangeList struct {
@@ -87,11 +86,12 @@ func (e *RunLogError) Error() string {
 
 type RunLogResult struct {
 	changeList *ChangeList
-	status     map[string]string
-	err        *RunLogError
+
+	status map[string]*LogProcess
+	err    *RunLogError
 }
 
-func (r *RunLogResult) Init(l *ChangeList, s map[string]string, e *RunLogError) {
+func (r *RunLogResult) Init(l *ChangeList, s map[string]*LogProcess, e *RunLogError) {
 	r.changeList = l
 	r.status = s
 	r.err = e
@@ -103,7 +103,7 @@ func (r *RunLogResult) ChangeList() *ChangeList {
 
 func (r *RunLogResult) Position(machineID string) string {
 	if pos, ok := r.status[machineID]; ok {
-		return pos
+		return pos.gid
 	}
 	return ""
 }
@@ -113,12 +113,12 @@ func (r *RunLogResult) Error() error {
 }
 
 type RunLogWorker struct {
-	input     *LogInput
-	position  string
-	process   int64
-	err       error
-	pendingOp *LogOperation
-	it        *WalIterator
+	input            *LogInput
+	process          *LogProcess
+	err              error
+	pendingOp        *LogOperation
+	pendingOpProcess *LogProcess
+	it               *WalIterator
 }
 
 type RunLogContext struct {
@@ -136,15 +136,11 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 		if input == nil {
 			continue
 		}
-		it, err := input.w.IteratorFrom(input.start, false)
-		if err != nil {
-			return err
-		}
+		it := input.w.IteratorOffset(input.process.offset)
 		c.workers[input.machineID] = &RunLogWorker{
-			input:    input,
-			position: input.start,
-			process:  input.startNum,
-			it:       it,
+			input:   input,
+			process: input.process,
+			it:      it,
 		}
 	}
 	return nil
@@ -152,7 +148,7 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 
 func (c *RunLogContext) Progress(machineID string) int64 {
 	if w, ok := c.workers[machineID]; ok {
-		return w.process
+		return w.process.num
 	}
 	return 0
 }
@@ -256,20 +252,25 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 		if !r.runLogInner(c, worker.pendingOp) {
 			return false
 		}
-		worker.position = worker.pendingOp.Gid
-		worker.process = worker.pendingOp.Num
+		worker.process = worker.pendingOpProcess
 		worker.pendingOp = nil
+		worker.pendingOpProcess = nil
 		count++
 	}
 
 	for worker.it.Next() {
 		logOp := worker.it.LogOp()
+		currentProcess := LogProcess{
+			num:    logOp.Num,
+			offset: worker.it.Offset(),
+			gid:    logOp.Gid,
+		}
 		if !r.runLogInner(c, logOp) {
 			worker.pendingOp = logOp
+			worker.pendingOpProcess = &currentProcess
 			return count > 0
 		}
-		worker.position = logOp.Gid
-		worker.process = logOp.Num
+		worker.process = &currentProcess
 		count++
 	}
 	return count > 0
@@ -302,7 +303,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 		}
 	}
 
-	result := RunLogResult{status: make(map[string]string), changeList: c.changeList}
+	result := RunLogResult{status: make(map[string]*LogProcess), changeList: c.changeList}
 	for _, worker := range c.workers {
 		if worker.err != nil {
 			if result.err == nil {
@@ -310,7 +311,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 			}
 			result.err.errs = append(result.err.errs, worker.err)
 		}
-		result.status[worker.input.machineID] = worker.position
+		result.status[worker.input.machineID] = worker.process
 	}
 	return &result, nil
 }

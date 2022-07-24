@@ -11,14 +11,8 @@ import (
 )
 
 func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridStorage, error) {
-	wal := Wal{}
-	err := wal.Init(logFile, l, false)
-	if err != nil {
-		return nil, err
-	}
-
 	s := HybridStorage{}
-	err = s.Init(&wal, "machine0")
+	err := s.Init("data", "machine0")
 	if err != nil {
 		return nil, err
 	}

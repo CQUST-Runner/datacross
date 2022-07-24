@@ -5,6 +5,49 @@ import (
 	"strings"
 )
 
+// suppose Visible()==true
+func compareNode(a *DBRecord, b *DBRecord, machineID string) int {
+	if a == nil && b == nil {
+		return 0
+	}
+	if a == nil {
+		return -1
+	}
+	if b == nil {
+		return 1
+	}
+	if a.Changes(machineID) > b.Changes(machineID) {
+		return 1
+	} else if a.Changes(machineID) < b.Changes(machineID) {
+		return -1
+	}
+
+	if a.Seq > b.Seq {
+		return 1
+	} else if a.Seq < b.Seq {
+		return -1
+	}
+
+	if a.MachineID > b.MachineID {
+		return 1
+	} else if a.MachineID < b.MachineID {
+		return -1
+	} else {
+		// should not be
+		return 0
+	}
+}
+
+func findMain(a []*DBRecord, machineID string) *DBRecord {
+	var maxRecord *DBRecord
+	for _, record := range a {
+		if compareNode(record, maxRecord, machineID) > 0 {
+			maxRecord = record
+		}
+	}
+	return maxRecord
+}
+
 type ValueVersion struct {
 	key       string
 	value     string
