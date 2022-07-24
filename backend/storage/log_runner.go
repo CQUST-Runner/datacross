@@ -164,12 +164,13 @@ func (r *LogRunner) Init(machineID string, s NodeStorage) error {
 	return nil
 }
 
-func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
+func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *LogOperation) bool {
 	if logOp.PrevNum == 0 {
 		record := DBRecord{
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
+			Offset:             process.offset,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
 			IsDeleted:          logOp.Op == int32(Op_Del),
@@ -182,7 +183,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		c.changeList.UpdateChangeList(nil, &record)
 		err := r.s.Add(&record)
 		if err != nil {
-			logger.Error("add leaf[%v] [%v] failed", record.Key, record.CurrentLogGid)
+			logger.Error("add leaf[%v] [%v] failed[%v]", record.Key, record.CurrentLogGid, err)
 			return false
 		}
 		return true
@@ -201,6 +202,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
+			Offset:             process.offset,
 			PrevMachineID:      parent.MachineID,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
@@ -225,6 +227,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, logOp *LogOperation) bool {
 		Key:                logOp.Key,
 		Value:              logOp.Value,
 		MachineID:          logOp.MachineId,
+		Offset:             process.offset,
 		PrevMachineID:      logOp.PrevMachineId,
 		Seq:                logOp.Seq,
 		CurrentLogGid:      logOp.Gid,
@@ -249,7 +252,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 	count := 0
 
 	if worker.pendingOp != nil {
-		if !r.runLogInner(c, worker.pendingOp) {
+		if !r.runLogInner(c, worker.pendingOpProcess, worker.pendingOp) {
 			return false
 		}
 		worker.process = worker.pendingOpProcess
@@ -265,7 +268,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 			offset: worker.it.Offset(),
 			gid:    logOp.Gid,
 		}
-		if !r.runLogInner(c, logOp) {
+		if !r.runLogInner(c, &currentProcess, logOp) {
 			worker.pendingOp = logOp
 			worker.pendingOpProcess = &currentProcess
 			return count > 0

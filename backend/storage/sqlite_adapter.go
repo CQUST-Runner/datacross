@@ -35,6 +35,7 @@ type DBRecord struct {
 	Key           string `gorm:"column:key"`
 	Value         string `gorm:"column:value"`
 	MachineID     string `gorm:"column:machine_id"`
+	Offset        int64  `gorm:"column:offset"`
 	PrevMachineID string `gorm:"column:prev_machine_id"`
 	Seq           uint64 `gorm:"column:seq"`
 	CurrentLogGid string `gorm:"column:gid"`
@@ -48,6 +49,14 @@ type DBRecord struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	DeletedAt          sql.NullTime `gorm:"index"`
+}
+
+type LogOffset struct {
+	Offset    int64  `gorm:"column:offset"`
+	MachineID string `gorm:"column:machine_id"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt sql.NullTime `gorm:"index"`
 }
 
 func (r *DBRecord) Visible() bool {
@@ -101,6 +110,10 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 	if err != nil {
 		return err
 	}
+	err = db.AutoMigrate(&LogOffset{})
+	if err != nil {
+		return err
+	}
 
 	s.db = db
 	s.tableName = tableName
@@ -129,7 +142,7 @@ func (s *SqliteAdapter) Close() error {
 
 func (s *SqliteAdapter) Has(gid string) (bool, error) {
 	recs := []DBRecord{}
-	result := s.workingDB.Find(&recs, "gid = ?", gid)
+	result := s.workingDB.Model(&DBRecord{}).Find(&recs, "gid = ?", gid)
 	if result.Error != nil {
 		return false, result.Error
 	}
@@ -144,7 +157,11 @@ func (s *SqliteAdapter) Add(record *DBRecord) error {
 		}
 		return fmt.Errorf("node exists")
 	} else {
-		return s.workingDB.Create(record).Error
+
+		return s.Transaction(func(s2 *SqliteAdapter) error {
+			return s2.workingDB.Model(&DBRecord{}).Create(record).Error
+		})
+
 	}
 }
 
@@ -160,18 +177,18 @@ func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
 		if err := s.Del(old); err != nil {
 			return err
 		}
-		return s.workingDB.Create(new).Error
+		return s.workingDB.Model(&DBRecord{}).Create(new).Error
 	})
 }
 
 func (s *SqliteAdapter) Del(gid string) error {
-	return s.workingDB.Where("gid = ?", gid).Delete(&DBRecord{CurrentLogGid: gid}).Error
+	return s.workingDB.Model(&DBRecord{}).Where("gid = ?", gid).Delete(&DBRecord{CurrentLogGid: gid}).Error
 }
 
 func (s *SqliteAdapter) GetByKey(key string) ([]*DBRecord, error) {
 
 	records := []*DBRecord{}
-	result := s.workingDB.Where("key = ?", key).Find(&records)
+	result := s.workingDB.Model(&DBRecord{}).Where("key = ?", key).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -180,7 +197,7 @@ func (s *SqliteAdapter) GetByKey(key string) ([]*DBRecord, error) {
 
 func (s *SqliteAdapter) GetByGid(gid string) (*DBRecord, error) {
 	rec := DBRecord{}
-	result := s.workingDB.Where("gid = ?", gid).First(&rec)
+	result := s.workingDB.Model(&DBRecord{}).Where("gid = ?", gid).First(&rec)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -189,7 +206,7 @@ func (s *SqliteAdapter) GetByGid(gid string) (*DBRecord, error) {
 
 func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 	records := []*DBRecord{}
-	result := s.workingDB.Find(&records)
+	result := s.workingDB.Model(&DBRecord{}).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}

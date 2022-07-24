@@ -14,10 +14,10 @@ type ParticipantInfo struct {
 	walFile      string
 	dbFile       string
 
-	network *NetworkInfo2
+	network *NetworkInfo
 }
 
-func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo2) error {
+func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo) error {
 	personalPath := getPersonalPath(wd, name)
 	walPath := getWalFilePath(personalPath)
 	dbPath := getDBFilePath(personalPath)
@@ -49,12 +49,12 @@ func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo2) error {
 	return nil
 }
 
-type NetworkInfo2 struct {
+type NetworkInfo struct {
 	wd           string
 	participants map[string]*ParticipantInfo
 }
 
-func (n *NetworkInfo2) Init(wd string) error {
+func (n *NetworkInfo) Init(wd string) error {
 	all, err := discoveryAllParticipants(wd)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (n *NetworkInfo2) Init(wd string) error {
 	return nil
 }
 
-func (n *NetworkInfo2) Add(name string) *ParticipantInfo {
+func (n *NetworkInfo) Add(name string) *ParticipantInfo {
 	if _, ok := n.participants[name]; !ok {
 		p := ParticipantInfo{}
 		// TODO: handle error
@@ -154,7 +154,7 @@ func (m *LogProcessMgr) Set(machineID string, process *LogProcess) {
 
 // Participant ...
 type Participant struct {
-	network *NetworkInfo2
+	network *NetworkInfo
 	m       *LogProcessMgr
 	me      *ParticipantInfo
 
@@ -228,7 +228,7 @@ func (s *Participant) Init(wd string, machineID string) error {
 		}
 	}
 
-	network := NetworkInfo2{}
+	network := NetworkInfo{}
 	err := network.Init(wd)
 	if err != nil {
 		return err
@@ -239,9 +239,15 @@ func (s *Participant) Init(wd string, machineID string) error {
 	m := LogProcessMgr{}
 	m.Init()
 
-	ns := NodeStorageImpl{}
-	ns.Init()
+	// ns := NodeStorageImpl{}
+	// ns.Init()
 
+	os.Remove(me.dbFile)
+	ns := SqliteAdapter{}
+	err = ns.Init(me.dbFile, "")
+	if err != nil {
+		return err
+	}
 	runner := LogRunner{}
 	err = runner.Init(machineID, &ns)
 	if err != nil {
