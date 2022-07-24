@@ -51,7 +51,7 @@ type DBRecord struct {
 	DeletedAt          sql.NullTime `gorm:"index"`
 }
 
-type LogOffset struct {
+type LogProcess struct {
 	Offset    int64  `gorm:"column:offset"`
 	Num       int64  `gorm:"column:num"`
 	Gid       string `gorm:"column:gid"`
@@ -112,7 +112,7 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 	if err != nil {
 		return err
 	}
-	err = db.AutoMigrate(&LogOffset{})
+	err = db.AutoMigrate(&LogProcess{})
 	if err != nil {
 		return err
 	}
@@ -139,16 +139,16 @@ func (s *SqliteAdapter) Close() error {
 	return nil
 }
 
-func (s *SqliteAdapter) updateLogOffset(offset *LogOffset) error {
-	recs := []*LogOffset{}
-	result := s.workingDB.Model(&LogOffset{}).Find(&recs, "machine_id = ?", offset.MachineID)
+func (s *SqliteAdapter) updateLogProcess(offset *LogProcess) error {
+	recs := []*LogProcess{}
+	result := s.workingDB.Model(&LogProcess{}).Find(&recs, "machine_id = ?", offset.MachineID)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected > 0 {
-		return s.workingDB.Model(&LogOffset{}).Where("machine_id = ?", offset.MachineID).Updates(offset).Error
+		return s.workingDB.Model(&LogProcess{}).Where("machine_id = ?", offset.MachineID).Updates(offset).Error
 	} else {
-		return s.workingDB.Model(&LogOffset{}).Create(offset).Error
+		return s.workingDB.Model(&LogProcess{}).Create(offset).Error
 	}
 }
 
@@ -177,7 +177,7 @@ func (s *SqliteAdapter) Add(record *DBRecord) error {
 			if err := s2.workingDB.Model(&DBRecord{}).Create(record).Error; err != nil {
 				return err
 			}
-			return s2.updateLogOffset(&LogOffset{MachineID: record.MachineID, Offset: record.Offset, Gid: record.CurrentLogGid, Num: record.Num})
+			return s2.updateLogProcess(&LogProcess{MachineID: record.MachineID, Offset: record.Offset, Gid: record.CurrentLogGid, Num: record.Num})
 		})
 
 	}
@@ -198,7 +198,7 @@ func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
 		if err := s.workingDB.Model(&DBRecord{}).Create(new).Error; err != nil {
 			return err
 		}
-		return s.updateLogOffset(&LogOffset{MachineID: new.MachineID, Offset: new.Offset, Gid: new.CurrentLogGid, Num: new.Num})
+		return s.updateLogProcess(&LogProcess{MachineID: new.MachineID, Offset: new.Offset, Gid: new.CurrentLogGid, Num: new.Num})
 	})
 }
 
@@ -234,14 +234,14 @@ func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 	return records, nil
 }
 
-func (s *SqliteAdapter) Offsets() (map[string]*LogOffset, error) {
+func (s *SqliteAdapter) Offsets() (map[string]*LogProcess, error) {
 
-	records := []*LogOffset{}
-	result := s.workingDB.Model(&LogOffset{}).Find(&records)
+	records := []*LogProcess{}
+	result := s.workingDB.Model(&LogProcess{}).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	offsets := make(map[string]*LogOffset)
+	offsets := make(map[string]*LogProcess)
 	for _, rec := range records {
 		offsets[rec.MachineID] = rec
 	}

@@ -103,7 +103,7 @@ func (r *RunLogResult) ChangeList() *ChangeList {
 
 func (r *RunLogResult) Position(machineID string) string {
 	if pos, ok := r.status[machineID]; ok {
-		return pos.gid
+		return pos.Gid
 	}
 	return ""
 }
@@ -136,7 +136,7 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 		if input == nil {
 			continue
 		}
-		it := input.w.IteratorOffset(input.process.offset)
+		it := input.w.IteratorOffset(input.process.Offset)
 		c.workers[input.machineID] = &RunLogWorker{
 			input:   input,
 			process: input.process,
@@ -148,7 +148,7 @@ func (c *RunLogContext) Init(i ...*LogInput) error {
 
 func (c *RunLogContext) Progress(machineID string) int64 {
 	if w, ok := c.workers[machineID]; ok {
-		return w.process.num
+		return w.process.Num
 	}
 	return 0
 }
@@ -170,7 +170,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
-			Offset:             process.offset,
+			Offset:             process.Offset,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
 			IsDeleted:          logOp.Op == int32(Op_Del),
@@ -202,7 +202,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
-			Offset:             process.offset,
+			Offset:             process.Offset,
 			PrevMachineID:      parent.MachineID,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
@@ -227,7 +227,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 		Key:                logOp.Key,
 		Value:              logOp.Value,
 		MachineID:          logOp.MachineId,
-		Offset:             process.offset,
+		Offset:             process.Offset,
 		PrevMachineID:      logOp.PrevMachineId,
 		Seq:                logOp.Seq,
 		CurrentLogGid:      logOp.Gid,
@@ -264,9 +264,9 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 	for worker.it.Next() {
 		logOp := worker.it.LogOp()
 		currentProcess := LogProcess{
-			num:    logOp.Num,
-			offset: worker.it.Offset(),
-			gid:    logOp.Gid,
+			Num:    logOp.Num,
+			Offset: worker.it.Offset(),
+			Gid:    logOp.Gid,
 		}
 		if !r.runLogInner(c, &currentProcess, logOp) {
 			worker.pendingOp = logOp

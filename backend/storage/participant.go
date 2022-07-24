@@ -125,12 +125,6 @@ func getDBFilePath(personalPath string) string {
 // TODO background syncing, thread safety?
 // TODO set json flag to output single line json
 
-type LogProcess struct {
-	offset int64
-	gid    string
-	num    int64
-}
-
 type LogProcessMgr struct {
 	m map[string]*LogProcess
 }
@@ -212,7 +206,7 @@ func (s *Participant) runLog() error {
 	return nil
 }
 
-func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, map[string]*LogOffset, error) {
+func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, map[string]*LogProcess, error) {
 
 	ns := NodeStorageImpl{}
 	ns.Init()
@@ -270,7 +264,7 @@ func (s *Participant) Init(wd string, machineID string) error {
 	}
 
 	for machineID, offset := range offsets {
-		m.Set(machineID, &LogProcess{offset: offset.Offset, num: offset.Num, gid: offset.Gid})
+		m.Set(machineID, offset)
 	}
 
 	// os.Remove(me.dbFile)
