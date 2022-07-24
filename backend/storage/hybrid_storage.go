@@ -133,6 +133,10 @@ func (s *HybridStorage) WithMachineID(string) Storage {
 }
 
 func (s *HybridStorage) Save(key string, value string) error {
+	if err := s.runLog(); err != nil {
+		return err
+	}
+
 	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return err
@@ -140,7 +144,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 	leaves = filterVisible(leaves)
 
 	if len(leaves) == 0 {
-		gid, num, err := s.w.Append(&LogOperation{
+		_, _, err := s.w.Append(&LogOperation{
 			Op:            int32(Op_Modify),
 			Key:           key,
 			Value:         value,
@@ -157,20 +161,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 			return err
 		}
 
-		return s.f.Add(&DBRecord{
-			Key:                key,
-			Value:              value,
-			MachineID:          s.machineID,
-			PrevMachineID:      "",
-			Seq:                0,
-			CurrentLogGid:      gid,
-			PrevLogGid:         "",
-			IsDiscarded:        false,
-			IsDeleted:          false,
-			MachineChangeCount: map[string]int32{s.machineID: 1},
-			Num:                num,
-			PrevNum:            0,
-		})
+		return nil
 	}
 
 	main := findMain(leaves, s.machineID)
@@ -178,7 +169,7 @@ func (s *HybridStorage) Save(key string, value string) error {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	gid, num, err := s.w.Append(&LogOperation{
+	_, _, err = s.w.Append(&LogOperation{
 		Op:            int32(Op_Modify),
 		Key:           key,
 		Value:         value,
@@ -194,23 +185,15 @@ func (s *HybridStorage) Save(key string, value string) error {
 	if err != nil {
 		return err
 	}
-	return s.f.Replace(main.CurrentLogGid, &DBRecord{
-		Key:                key,
-		Value:              value,
-		MachineID:          s.machineID,
-		PrevMachineID:      main.PrevMachineID,
-		Seq:                main.Seq + 1,
-		CurrentLogGid:      gid,
-		PrevLogGid:         main.CurrentLogGid,
-		IsDiscarded:        false,
-		IsDeleted:          false,
-		MachineChangeCount: main.AddChange(s.machineID, 1),
-		Num:                num,
-		PrevNum:            main.Num,
-	})
+	return nil
 }
 
 func (s *HybridStorage) Del(key string) error {
+
+	if err := s.runLog(); err != nil {
+		return err
+	}
+
 	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return err
@@ -224,7 +207,7 @@ func (s *HybridStorage) Del(key string) error {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	gid, num, err := s.w.Append(&LogOperation{
+	_, _, err = s.w.Append(&LogOperation{
 		Op:            int32(Op_Del),
 		Key:           key,
 		Gid:           "",
@@ -239,22 +222,16 @@ func (s *HybridStorage) Del(key string) error {
 	if err != nil {
 		return err
 	}
-	return s.f.Replace(main.CurrentLogGid, &DBRecord{
-		Key:                key,
-		MachineID:          s.machineID,
-		PrevMachineID:      main.PrevMachineID,
-		Seq:                main.Seq + 1,
-		CurrentLogGid:      gid,
-		PrevLogGid:         main.CurrentLogGid,
-		IsDiscarded:        false,
-		IsDeleted:          true,
-		MachineChangeCount: main.AddChange(s.machineID, 1),
-		Num:                num,
-		PrevNum:            main.Num,
-	})
+
+	return nil
 }
 
 func (s *HybridStorage) Has(key string) (bool, error) {
+
+	if err := s.runLog(); err != nil {
+		return false, err
+	}
+
 	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return false, err
@@ -275,6 +252,11 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 }
 
 func (s *HybridStorage) Load(key string) (*Value, error) {
+
+	if err := s.runLog(); err != nil {
+		return nil, err
+	}
+
 	leaves, err := s.f.GetByKey(key)
 	if err != nil {
 		return nil, err
@@ -293,6 +275,11 @@ func (s *HybridStorage) Load(key string) (*Value, error) {
 }
 
 func (s *HybridStorage) All() ([]*Value, error) {
+
+	if err := s.runLog(); err != nil {
+		return nil, err
+	}
+
 	leaves, err := s.f.AllNodes()
 	if err != nil {
 		return nil, err
@@ -324,7 +311,7 @@ func (s *HybridStorage) discard(gid string) error {
 		return err
 	}
 
-	gid, num, err := s.w.Append(&LogOperation{
+	_, _, err = s.w.Append(&LogOperation{
 		Op:            int32(Op_Discard),
 		Key:           record.Key,
 		PrevGid:       record.CurrentLogGid,
@@ -339,23 +326,15 @@ func (s *HybridStorage) discard(gid string) error {
 		return err
 	}
 
-	err = s.f.Replace(gid, &DBRecord{
-		Key:                record.Key,
-		MachineID:          s.machineID,
-		PrevMachineID:      record.MachineID,
-		Seq:                record.Seq + 1,
-		CurrentLogGid:      gid,
-		PrevLogGid:         record.CurrentLogGid,
-		IsDiscarded:        true,
-		IsDeleted:          false,
-		MachineChangeCount: record.AddChange(s.machineID, 1),
-		Num:                num,
-		PrevNum:            record.Num,
-	})
-	return err
+	return nil
 }
 
 func (s *HybridStorage) Accept(v *Value, seq int) error {
+
+	if err := s.runLog(); err != nil {
+		return err
+	}
+
 	if len(v.Branches()) == 0 {
 		return fmt.Errorf("key is not in conflict state")
 	}
