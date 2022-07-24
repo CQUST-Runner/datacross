@@ -15,7 +15,6 @@ type NodeStorage interface {
 	ReadOnlyNodeStorage
 	Add(record *DBRecord) error
 	Replace(old string, new *DBRecord) error
-	Del(gid string) error
 }
 
 type NodeStorageImpl struct {

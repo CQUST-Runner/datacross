@@ -137,6 +137,19 @@ func (s *SqliteAdapter) Close() error {
 	return nil
 }
 
+func (s *SqliteAdapter) updateLogOffset(offset *LogOffset) error {
+	recs := []*LogOffset{}
+	result := s.workingDB.Model(&LogOffset{}).Find(&recs, "machine_id = ?", offset.MachineID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		return s.workingDB.Model(&LogOffset{}).Where("machine_id = ?", offset.MachineID).Updates(offset).Error
+	} else {
+		return s.workingDB.Model(&LogOffset{}).Create(offset).Error
+	}
+}
+
 //TODO: whether to have soft deletion enabled
 //TODO: create index
 
@@ -159,7 +172,10 @@ func (s *SqliteAdapter) Add(record *DBRecord) error {
 	} else {
 
 		return s.Transaction(func(s2 *SqliteAdapter) error {
-			return s2.workingDB.Model(&DBRecord{}).Create(record).Error
+			if err := s2.workingDB.Model(&DBRecord{}).Create(record).Error; err != nil {
+				return err
+			}
+			return s2.updateLogOffset(&LogOffset{MachineID: record.MachineID, Offset: record.Offset})
 		})
 
 	}
@@ -174,14 +190,17 @@ func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
 		return fmt.Errorf("node not exist")
 	}
 	return s.Transaction(func(s *SqliteAdapter) error {
-		if err := s.Del(old); err != nil {
+		if err := s.delNode(old); err != nil {
 			return err
 		}
-		return s.workingDB.Model(&DBRecord{}).Create(new).Error
+		if err := s.workingDB.Model(&DBRecord{}).Create(new).Error; err != nil {
+			return err
+		}
+		return s.updateLogOffset(&LogOffset{MachineID: new.MachineID, Offset: new.Offset})
 	})
 }
 
-func (s *SqliteAdapter) Del(gid string) error {
+func (s *SqliteAdapter) delNode(gid string) error {
 	return s.workingDB.Model(&DBRecord{}).Where("gid = ?", gid).Delete(&DBRecord{CurrentLogGid: gid}).Error
 }
 
