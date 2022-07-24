@@ -28,7 +28,7 @@ func loadConfig(filename string, c *Config) error {
 }
 
 var c *Config
-var p *storage.HybridStorage
+var p *storage.Participant
 
 func main() {
 	confFile := ""
@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("conf: ", conf)
 	c = &conf
 
-	participant := storage.HybridStorage{}
+	participant := storage.Participant{}
 	err = participant.Init(c.WorkingDirectory, c.MachineName)
 	if err != nil {
 		fmt.Println("init participant failed", err)

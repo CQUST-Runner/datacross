@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createHybridStorage(dbFile string, logFile string, l LogFormat) (*HybridStorage, error) {
-	s := HybridStorage{}
+func createHybridStorage(dbFile string, logFile string, l LogFormat) (*Participant, error) {
+	s := Participant{}
 	err := s.Init("data", "machine0")
 	if err != nil {
 		return nil, err
