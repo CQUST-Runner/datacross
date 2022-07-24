@@ -2,62 +2,26 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"offliner-backend/storage"
-	"os"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
-	// TODO: default not working
-	WorkingDirectory string `yaml:"wd" default:"./data"`
-	MachineName      string `yaml:"machine_name" default:"machine0"`
+type Shell struct {
+	r io.Reader
+	w io.Writer
+	p *storage.Participant
 }
 
-func loadConfig(filename string, c *Config) error {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	return yaml.Unmarshal(data, c)
+func (s *Shell) Init(input io.Reader, output io.Writer, p *storage.Participant) {
+	s.r = input
+	s.w = output
+	s.p = p
 }
 
-var c *Config
-var p *storage.Participant
-
-func main() {
-	confFile := ""
-	flag.StringVar(&confFile, "conf", "conf.yaml", "config file path")
-	flag.Parse()
-
-	conf := Config{}
-	err := loadConfig(confFile, &conf)
-	if err != nil {
-		fmt.Println("load conf file failed", err)
-		return
-	}
-	fmt.Println("conf: ", conf)
-	c = &conf
-
-	participant := storage.Participant{}
-	err = participant.Init(c.WorkingDirectory, c.MachineName)
-	if err != nil {
-		fmt.Println("init participant failed", err)
-		return
-	}
-	defer participant.Close()
-	p = &participant
-
-	repl()
-}
-
-func list(w io.Writer, args ...string) {
-	records, err := p.All()
+func (s *Shell) list(w io.Writer, args ...string) {
+	records, err := s.p.All()
 	if err != nil {
 		fmt.Fprintln(w, err)
 		return
@@ -65,14 +29,14 @@ func list(w io.Writer, args ...string) {
 	fmt.Fprintln(w, records)
 }
 
-func get(w io.Writer, args ...string) {
+func (s *Shell) get(w io.Writer, args ...string) {
 	if len(args) < 1 {
 		fmt.Fprintln(w, "too few args, usage: get <key>")
 		return
 	}
 
 	key := args[0]
-	val, err := p.Load(key)
+	val, err := s.p.Load(key)
 	if err != nil {
 		fmt.Fprintln(w, "get failed", err)
 		return
@@ -80,7 +44,7 @@ func get(w io.Writer, args ...string) {
 	fmt.Fprintln(w, val)
 }
 
-func set(w io.Writer, args ...string) {
+func (s *Shell) set(w io.Writer, args ...string) {
 	if len(args) < 2 {
 		fmt.Fprintln(w, "too few args, usage: set <key> <value>")
 		return
@@ -88,35 +52,35 @@ func set(w io.Writer, args ...string) {
 
 	key := args[0]
 	value := args[1]
-	err := p.Save(key, value)
+	err := s.p.Save(key, value)
 	if err != nil {
 		fmt.Fprintln(w, "set failed", err)
 		return
 	}
 }
 
-func del(w io.Writer, args ...string) {
+func (s *Shell) del(w io.Writer, args ...string) {
 	if len(args) < 1 {
 		fmt.Fprintln(w, "too few args, usage: del <key>")
 		return
 	}
 
 	key := args[0]
-	err := p.Del(key)
+	err := s.p.Del(key)
 	if err != nil {
 		fmt.Fprintln(w, "del failed", err)
 		return
 	}
 }
 
-func has(w io.Writer, args ...string) {
+func (s *Shell) has(w io.Writer, args ...string) {
 	if len(args) < 1 {
 		fmt.Fprintln(w, "too few args, usage: has <key>")
 		return
 	}
 
 	key := args[0]
-	has, err := p.Has(key)
+	has, err := s.p.Has(key)
 	if err != nil {
 		fmt.Fprintln(w, "has failed", err)
 		return
@@ -124,8 +88,8 @@ func has(w io.Writer, args ...string) {
 	fmt.Println(has)
 }
 
-func conflicts(w io.Writer, args ...string) {
-	conflicts, err := p.AllConflicts()
+func (s *Shell) conflicts(w io.Writer, args ...string) {
+	conflicts, err := s.p.AllConflicts()
 	if err != nil {
 		fmt.Fprintln(w, "get conflicts failed", err)
 		return
@@ -138,14 +102,14 @@ func conflicts(w io.Writer, args ...string) {
 	}
 }
 
-func resolve(w io.Writer, args ...string) {
+func (s *Shell) resolve(w io.Writer, args ...string) {
 	if len(args) < 1 {
 		fmt.Fprintln(w, "too few args, usage: resolve <key>")
 		return
 	}
 
 	key := args[0]
-	v, err := p.Load(key)
+	v, err := s.p.Load(key)
 	if err != nil {
 		fmt.Fprintf(w, "load key failed[%v]\n", err)
 		return
@@ -162,7 +126,7 @@ func resolve(w io.Writer, args ...string) {
 
 	fmt.Fprint(w, "enter seq num to accept(the num in the last column): ")
 	var seq int
-	_, err = fmt.Scan(&seq)
+	_, err = fmt.Fscan(s.r, &seq)
 	if err != nil {
 		fmt.Fprintln(w, err)
 		return
@@ -172,7 +136,7 @@ func resolve(w io.Writer, args ...string) {
 		return
 	}
 
-	err = p.Accept(v, seq)
+	err = s.p.Accept(v, seq)
 	if err != nil {
 		fmt.Fprintln(w, "error, ", err)
 		return
@@ -180,7 +144,7 @@ func resolve(w io.Writer, args ...string) {
 	fmt.Fprintln(w, "ok")
 }
 
-func help(w io.Writer, args ...string) {
+func (s *Shell) help(w io.Writer, args ...string) {
 	fmt.Fprintln(w, `
 list
 get <key>
@@ -194,7 +158,7 @@ exit
 	`)
 }
 
-func exec(w io.Writer, cmd string) {
+func (s *Shell) exec(w io.Writer, cmd string) {
 	cmd = strings.TrimSpace(cmd)
 	comps := strings.Split(cmd, " ")
 	tokens := []string{}
@@ -209,28 +173,28 @@ func exec(w io.Writer, cmd string) {
 
 	switch tokens[0] {
 	case "list":
-		list(w, tokens[1:]...)
+		s.list(w, tokens[1:]...)
 	case "get":
-		get(w, tokens[1:]...)
+		s.get(w, tokens[1:]...)
 	case "del":
-		del(w, tokens[1:]...)
+		s.del(w, tokens[1:]...)
 	case "has":
-		has(w, tokens[1:]...)
+		s.has(w, tokens[1:]...)
 	case "set":
-		set(w, tokens[1:]...)
+		s.set(w, tokens[1:]...)
 	case "resolve":
-		resolve(w, tokens[1:]...)
+		s.resolve(w, tokens[1:]...)
 	case "conflicts":
-		conflicts(w, tokens[1:]...)
+		s.conflicts(w, tokens[1:]...)
 	case "help":
-		help(w, tokens[1:]...)
+		s.help(w, tokens[1:]...)
 	default:
 		fmt.Printf("unknown command `%v`, type `help` for usage\n", tokens[0])
 	}
 }
 
-func repl() {
-	scanner := bufio.NewScanner(os.Stdin)
+func (s *Shell) Repl() {
+	scanner := bufio.NewScanner(s.r)
 	for {
 		ok := scanner.Scan()
 		if !ok {
@@ -243,6 +207,6 @@ func repl() {
 			break
 		}
 
-		exec(os.Stdout, cmd)
+		s.exec(s.w, cmd)
 	}
 }
