@@ -29,6 +29,18 @@ func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo2) error {
 		}
 	}
 
+	if !IsFile(walPath) {
+		w := Wal{}
+		err := w.Init(walPath, &BinLog{}, false)
+		if err != nil {
+			return err
+		}
+		err = w.Close()
+		if err != nil {
+			return err
+		}
+	}
+
 	p.name = name
 	p.personalPath = personalPath
 	p.walFile = walPath
@@ -213,6 +225,12 @@ func (s *Participant) Init(wd string, machineID string) error {
 		wd = path.Join(cwd, wd)
 	}
 	wd = path.Clean(wd)
+	if !IsDir(wd) {
+		err := os.MkdirAll(wd, 0777)
+		if err != nil {
+			return err
+		}
+	}
 
 	network := NetworkInfo2{}
 	err := network.Init(wd)

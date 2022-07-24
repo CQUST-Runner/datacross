@@ -16,6 +16,8 @@ func getWalFile() string {
 }
 
 func delWalFile() {
+	os.RemoveAll("./data")
+
 	_, err := os.Stat(walFileName)
 	if err != nil {
 		return
