@@ -34,15 +34,15 @@ func (a *builtinLoggerAdapter) Category(catetory string) Logger {
 }
 
 func (a *builtinLoggerAdapter) Warn(format string, args ...interface{}) {
-	a.l.Output(2, fmt.Sprintf(" WARN "+format, args...))
+	_ = a.l.Output(2, fmt.Sprintf(" WARN "+format, args...))
 }
 
 func (a *builtinLoggerAdapter) Error(format string, args ...interface{}) {
-	a.l.Output(2, fmt.Sprintf(" ERROR "+format, args...))
+	_ = a.l.Output(2, fmt.Sprintf(" ERROR "+format, args...))
 }
 
 func (a *builtinLoggerAdapter) Info(format string, args ...interface{}) {
-	a.l.Output(2, fmt.Sprintf(" INFO "+format, args...))
+	_ = a.l.Output(2, fmt.Sprintf(" INFO "+format, args...))
 }
 
 var logger Logger = newLogger(os.Stdout, "Core")

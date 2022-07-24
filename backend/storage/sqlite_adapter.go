@@ -71,11 +71,7 @@ func (r *DBRecord) AddChange(machineID string, changes int32) map[string]int32 {
 			m[k] = v
 		}
 	}
-	if _, ok := m[machineID]; ok {
-		m[machineID] += changes
-	} else {
-		m[machineID] = changes
-	}
+	m[machineID] += changes
 	return m
 }
 
@@ -133,8 +129,7 @@ func (s *SqliteAdapter) Close() error {
 
 func (s *SqliteAdapter) Has(gid string) (bool, error) {
 	recs := []DBRecord{}
-	var result *gorm.DB
-	result = s.workingDB.Find(&recs, "gid = ?", gid)
+	result := s.workingDB.Find(&recs, "gid = ?", gid)
 	if result.Error != nil {
 		return false, result.Error
 	}
@@ -176,8 +171,7 @@ func (s *SqliteAdapter) Del(gid string) error {
 func (s *SqliteAdapter) GetByKey(key string) ([]*DBRecord, error) {
 
 	records := []*DBRecord{}
-	var result *gorm.DB
-	result = s.workingDB.Where("key = ?", key).Find(&records)
+	result := s.workingDB.Where("key = ?", key).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -194,10 +188,8 @@ func (s *SqliteAdapter) GetByGid(gid string) (*DBRecord, error) {
 }
 
 func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
-
 	records := []*DBRecord{}
-	var result *gorm.DB
-	result = s.workingDB.Find(&records)
+	result := s.workingDB.Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -205,6 +197,5 @@ func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 }
 
 func _() {
-	// var _ Storage = &SqliteAdapter{}
 	var _ NodeStorage = &SqliteAdapter{}
 }

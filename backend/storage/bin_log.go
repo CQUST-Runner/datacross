@@ -124,7 +124,7 @@ func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) (int64, error) 
 	if writeSize > math.MaxUint32 {
 		return 0, fmt.Errorf("log entry too large")
 	}
-	entryBuffer := make([]byte, writeSize, writeSize)
+	entryBuffer := make([]byte, writeSize)
 	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : 4+entry.Size()])
 	if err != nil {
 		return 0, err
@@ -163,7 +163,7 @@ func (l *BinLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 		return 4, nil
 	}
 
-	entryBuffer := make([]byte, size, size)
+	entryBuffer := make([]byte, size)
 	readSz, err = f.Read(entryBuffer)
 	if err != nil {
 		return 0, err
