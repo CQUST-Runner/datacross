@@ -5,13 +5,17 @@ import (
 	"fmt"
 )
 
-type NodeStorage interface {
+type ReadOnlyNodeStorage interface {
 	GetByKey(key string) ([]*DBRecord, error)
 	GetByGid(gid string) (*DBRecord, error)
+	AllNodes() ([]*DBRecord, error)
+}
+
+type NodeStorage interface {
+	ReadOnlyNodeStorage
 	Add(record *DBRecord) error
 	Replace(old string, new *DBRecord) error
 	Del(gid string) error
-	AllNodes() ([]*DBRecord, error)
 }
 
 type NodeStorageImpl struct {

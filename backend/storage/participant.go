@@ -159,7 +159,8 @@ type Participant struct {
 	me      *ParticipantInfo
 
 	w         *WalHelper
-	f         NodeStorage
+	f         ReadOnlyNodeStorage
+	runner    *LogRunner
 	machineID string
 
 	// TODO
@@ -192,11 +193,6 @@ func (s *Participant) runLogInputs() (inputs []*LogInput, retErr error) {
 }
 
 func (s *Participant) runLog() error {
-	runner := LogRunner{}
-	err := runner.Init(s.machineID, s.f)
-	if err != nil {
-		return err
-	}
 
 	inputs, err := s.runLogInputs()
 	if err != nil {
@@ -204,7 +200,7 @@ func (s *Participant) runLog() error {
 	}
 	// TODO inputs.Close
 
-	results, err := runner.Run(inputs...)
+	results, err := s.runner.Run(inputs...)
 	if err != nil {
 		return err
 	}
@@ -245,6 +241,12 @@ func (s *Participant) Init(wd string, machineID string) error {
 
 	ns := NodeStorageImpl{}
 	ns.Init()
+
+	runner := LogRunner{}
+	err = runner.Init(machineID, &ns)
+	if err != nil {
+		return err
+	}
 
 	w := WalHelper{}
 	w.Init(me.walFile, &BinLog{}, 1)
