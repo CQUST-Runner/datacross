@@ -143,7 +143,7 @@ func (m *LogProcessMgr) Get(machineID string) *LogProcess {
 	if p, ok := m.m[machineID]; ok {
 		return p
 	}
-	p := LogProcess{}
+	p := LogProcess{Offset: HeaderSize}
 	m.m[machineID] = &p
 	return &p
 }
@@ -283,12 +283,6 @@ func (s *Participant) Init(wd string, machineID string) error {
 	m := LogProcessMgr{}
 	m.Init(offsets...)
 
-	// os.Remove(me.dbFile)
-	// ns := SqliteAdapter{}
-	// err = ns.Init(me.dbFile, "")
-	// if err != nil {
-	// 	return err
-	// }
 	runner := LogRunner{}
 	err = runner.Init(machineID, ns)
 	if err != nil {

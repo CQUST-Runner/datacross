@@ -106,6 +106,11 @@ func (n *NodeStorageImpl) Replace(old string, new *DBRecord) error {
 		return fmt.Errorf("old not exist")
 	}
 
+	e1 := n.getByGidInternal(new.CurrentLogGid)
+	if e1 != nil {
+		return fmt.Errorf("new node already exist")
+	}
+
 	if e.Value.(*DBRecord).Key != new.Key {
 		return fmt.Errorf("key not match")
 	}

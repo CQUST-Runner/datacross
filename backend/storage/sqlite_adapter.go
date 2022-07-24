@@ -52,7 +52,7 @@ type DBRecord struct {
 }
 
 type LogProcess struct {
-	Offset    int64  `gorm:"column:offset"`
+	Offset    int64  `gorm:"column:offset"` // HeaderSize should be used as initial value
 	Num       int64  `gorm:"column:num"`
 	Gid       string `gorm:"column:gid"`
 	MachineID string `gorm:"column:machine_id"`
@@ -191,6 +191,14 @@ func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
 	if !has {
 		return fmt.Errorf("node not exist")
 	}
+	has, err = s.Has(new.CurrentLogGid)
+	if err != nil {
+		return err
+	}
+	if has {
+		return fmt.Errorf("new node already exist")
+	}
+
 	return s.Transaction(func(s *SqliteAdapter) error {
 		if err := s.delNode(old); err != nil {
 			return err
