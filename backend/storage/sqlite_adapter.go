@@ -53,6 +53,8 @@ type DBRecord struct {
 
 type LogOffset struct {
 	Offset    int64  `gorm:"column:offset"`
+	Num       int64  `gorm:"column:num"`
+	Gid       string `gorm:"column:gid"`
 	MachineID string `gorm:"column:machine_id"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -175,7 +177,7 @@ func (s *SqliteAdapter) Add(record *DBRecord) error {
 			if err := s2.workingDB.Model(&DBRecord{}).Create(record).Error; err != nil {
 				return err
 			}
-			return s2.updateLogOffset(&LogOffset{MachineID: record.MachineID, Offset: record.Offset})
+			return s2.updateLogOffset(&LogOffset{MachineID: record.MachineID, Offset: record.Offset, Gid: record.CurrentLogGid, Num: record.Num})
 		})
 
 	}
@@ -196,7 +198,7 @@ func (s *SqliteAdapter) Replace(old string, new *DBRecord) error {
 		if err := s.workingDB.Model(&DBRecord{}).Create(new).Error; err != nil {
 			return err
 		}
-		return s.updateLogOffset(&LogOffset{MachineID: new.MachineID, Offset: new.Offset})
+		return s.updateLogOffset(&LogOffset{MachineID: new.MachineID, Offset: new.Offset, Gid: new.CurrentLogGid, Num: new.Num})
 	})
 }
 
@@ -230,6 +232,20 @@ func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 		return nil, result.Error
 	}
 	return records, nil
+}
+
+func (s *SqliteAdapter) Offsets() (map[string]*LogOffset, error) {
+
+	records := []*LogOffset{}
+	result := s.workingDB.Model(&LogOffset{}).Find(&records)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	offsets := make(map[string]*LogOffset)
+	for _, rec := range records {
+		offsets[rec.MachineID] = rec
+	}
+	return offsets, nil
 }
 
 func (s *SqliteAdapter) Merge(other ReadOnlyNodeStorage) error {

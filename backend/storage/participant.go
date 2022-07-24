@@ -212,6 +212,31 @@ func (s *Participant) runLog() error {
 	return nil
 }
 
+func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, map[string]*LogOffset, error) {
+
+	ns := NodeStorageImpl{}
+	ns.Init()
+
+	sqlite := SqliteAdapter{}
+	err := sqlite.Init(dbFile, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer sqlite.Close()
+
+	offsets, err := sqlite.Offsets()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = ns.Merge(&sqlite)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &ns, offsets, nil
+}
+
 func (s *Participant) Init(wd string, machineID string) error {
 	if !path.IsAbs(wd) && !(len(wd) > 1 && wd[1] == ':') {
 		cwd, err := os.Getwd()
@@ -239,17 +264,23 @@ func (s *Participant) Init(wd string, machineID string) error {
 	m := LogProcessMgr{}
 	m.Init()
 
-	// ns := NodeStorageImpl{}
-	// ns.Init()
-
-	os.Remove(me.dbFile)
-	ns := SqliteAdapter{}
-	err = ns.Init(me.dbFile, "")
+	ns, offsets, err := s.newNodeStorageFromSqlite(me.dbFile)
 	if err != nil {
 		return err
 	}
+
+	for machineID, offset := range offsets {
+		m.Set(machineID, &LogProcess{offset: offset.Offset, num: offset.Num, gid: offset.Gid})
+	}
+
+	// os.Remove(me.dbFile)
+	// ns := SqliteAdapter{}
+	// err = ns.Init(me.dbFile, "")
+	// if err != nil {
+	// 	return err
+	// }
 	runner := LogRunner{}
-	err = runner.Init(machineID, &ns)
+	err = runner.Init(machineID, ns)
 	if err != nil {
 		return err
 	}
@@ -259,7 +290,7 @@ func (s *Participant) Init(wd string, machineID string) error {
 
 	s.network = &network
 	s.m = &m
-	s.f = &ns
+	s.f = ns
 	s.machineID = machineID
 	s.w = &w
 	s.me = me
