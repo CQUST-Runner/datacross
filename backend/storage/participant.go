@@ -525,13 +525,13 @@ func (s *Participant) All() ([]*Value, error) {
 	return results, nil
 }
 
-func (s *Participant) discard(gid string) error {
+func (s *Participant) discard(gid string) (*LogOperation, error) {
 	record, err := s.f.GetByGid(gid)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, _, err = s.w.Append(&LogOperation{
+	return &LogOperation{
 		Op:            int32(Op_Discard),
 		Key:           record.Key,
 		PrevGid:       record.CurrentLogGid,
@@ -541,12 +541,7 @@ func (s *Participant) discard(gid string) error {
 		PrevMachineId: record.MachineID,
 		Changes:       record.AddChange(s.machineID, 1),
 		PrevNum:       record.Num,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	}, nil
 }
 
 func (s *Participant) Accept(v *Value, seq int) error {
@@ -562,18 +557,26 @@ func (s *Participant) Accept(v *Value, seq int) error {
 		return fmt.Errorf("seq is invalid")
 	}
 
+	operations := []*LogOperation{}
 	for _, version := range v.versions {
 		if version == nil {
 			continue
 		}
 		if version.seq != seq {
-			err := s.discard(version.gid)
+			op, err := s.discard(version.gid)
 			if err != nil {
 				logger.Warn("discard version failed, seq[%v] gid[%v]", version.seq, version.gid)
+				return err
 			}
+			operations = append(operations, op)
 		}
 	}
-	return nil
+	if len(operations) == 0 {
+		return nil
+	}
+
+	_, _, err := s.w.Append(operations...)
+	return err
 }
 
 func (s *Participant) AllConflicts() ([]*Value, error) {

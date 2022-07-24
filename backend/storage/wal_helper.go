@@ -55,12 +55,12 @@ func (w *WalHelper) getW() (*Wal, error) {
 	return w.w, nil
 }
 
-func (w *WalHelper) Append(logOp *LogOperation) (string, int64, error) {
+func (w *WalHelper) Append(logOp ...*LogOperation) (string, int64, error) {
 	wal, err := w.getW()
 	if err != nil {
 		return "", 0, err
 	}
-	gid, num, err := wal.Append(logOp)
+	gid, num, err := wal.Append(logOp...)
 	if err != nil {
 		return "", 0, err
 	}
