@@ -496,6 +496,23 @@ func (s *Participant) Accept(v *Value, seq int) error {
 	return nil
 }
 
+func (s *Participant) AllConflicts() ([]*Value, error) {
+	all, err := s.All()
+	if err != nil {
+		return nil, err
+	}
+	results := []*Value{}
+	for _, v := range all {
+		if v == nil {
+			continue
+		}
+		if len(v.Branches()) > 0 {
+			results = append(results, v)
+		}
+	}
+	return results, nil
+}
+
 func (s *Participant) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }

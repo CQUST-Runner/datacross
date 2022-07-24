@@ -124,6 +124,20 @@ func has(w io.Writer, args ...string) {
 	fmt.Println(has)
 }
 
+func conflicts(w io.Writer, args ...string) {
+	conflicts, err := p.AllConflicts()
+	if err != nil {
+		fmt.Fprintln(w, "get conflicts failed", err)
+		return
+	}
+	for _, c := range conflicts {
+		if c == nil {
+			continue
+		}
+		fmt.Fprintln(w, c)
+	}
+}
+
 func resolve(w io.Writer, args ...string) {
 	if len(args) < 1 {
 		fmt.Fprintln(w, "too few args, usage: resolve <key>")
@@ -174,6 +188,7 @@ del <key>
 has <key>
 set <key> <value>
 resolve <key>
+conflicts
 help
 exit
 	`)
@@ -205,6 +220,8 @@ func exec(w io.Writer, cmd string) {
 		set(w, tokens[1:]...)
 	case "resolve":
 		resolve(w, tokens[1:]...)
+	case "conflicts":
+		conflicts(w, tokens[1:]...)
 	case "help":
 		help(w, tokens[1:]...)
 	default:
