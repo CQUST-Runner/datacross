@@ -257,7 +257,7 @@ func (s *Participant) Init(wd string, machineID string) error {
 	s.machineID = machineID
 	s.w = &w
 	s.me = me
-
+	s.runner = &runner
 	return nil
 }
 
