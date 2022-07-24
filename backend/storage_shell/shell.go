@@ -28,7 +28,7 @@ func loadConfig(filename string, c *Config) error {
 }
 
 var c *Config
-var p *storage.Participant
+var p *storage.HybridStorage
 
 func main() {
 	confFile := ""
@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("conf: ", conf)
 	c = &conf
 
-	participant := storage.Participant{}
+	participant := storage.HybridStorage{}
 	err = participant.Init(c.WorkingDirectory, c.MachineName)
 	if err != nil {
 		fmt.Println("init participant failed", err)
@@ -57,7 +57,7 @@ func main() {
 }
 
 func list(w io.Writer, args ...string) {
-	records, err := p.S().All()
+	records, err := p.All()
 	if err != nil {
 		fmt.Fprintln(w, err)
 		return
@@ -72,7 +72,7 @@ func get(w io.Writer, args ...string) {
 	}
 
 	key := args[0]
-	val, err := p.S().Load(key)
+	val, err := p.Load(key)
 	if err != nil {
 		fmt.Fprintln(w, "get failed", err)
 		return
@@ -88,7 +88,7 @@ func set(w io.Writer, args ...string) {
 
 	key := args[0]
 	value := args[1]
-	err := p.S().Save(key, value)
+	err := p.Save(key, value)
 	if err != nil {
 		fmt.Fprintln(w, "set failed", err)
 		return
@@ -102,7 +102,7 @@ func del(w io.Writer, args ...string) {
 	}
 
 	key := args[0]
-	err := p.S().Del(key)
+	err := p.Del(key)
 	if err != nil {
 		fmt.Fprintln(w, "del failed", err)
 		return
@@ -116,7 +116,7 @@ func has(w io.Writer, args ...string) {
 	}
 
 	key := args[0]
-	has, err := p.S().Has(key)
+	has, err := p.Has(key)
 	if err != nil {
 		fmt.Fprintln(w, "has failed", err)
 		return
@@ -131,7 +131,7 @@ func resolve(w io.Writer, args ...string) {
 	}
 
 	key := args[0]
-	v, err := p.S().Load(key)
+	v, err := p.Load(key)
 	if err != nil {
 		fmt.Fprintf(w, "load key failed[%v]\n", err)
 		return
@@ -158,7 +158,7 @@ func resolve(w io.Writer, args ...string) {
 		return
 	}
 
-	err = p.S().Accept(v, seq)
+	err = p.Accept(v, seq)
 	if err != nil {
 		fmt.Fprintln(w, "error, ", err)
 		return

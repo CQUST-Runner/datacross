@@ -2,6 +2,9 @@ package storage
 
 import (
 	"fmt"
+	"os"
+	"path"
+	"time"
 )
 
 type LogProcess struct {
@@ -40,6 +43,9 @@ type HybridStorage struct {
 	w         *WalHelper
 	f         NodeStorage
 	machineID string
+
+	// TODO
+	lastSyncTime time.Time
 }
 
 func (s *HybridStorage) runLogInputs() (inputs []*LogInput, retErr error) {
@@ -93,6 +99,14 @@ func (s *HybridStorage) runLog() error {
 }
 
 func (s *HybridStorage) Init(wd string, machineID string) error {
+	if !path.IsAbs(wd) && !(len(wd) > 1 && wd[1] == ':') {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		wd = path.Join(cwd, wd)
+	}
+	wd = path.Clean(wd)
 
 	network := NetworkInfo2{}
 	err := network.Init(wd)
@@ -357,10 +371,6 @@ func (s *HybridStorage) Accept(v *Value, seq int) error {
 }
 
 func (s *HybridStorage) Merge(Storage) error {
-	return fmt.Errorf("unsupported")
-}
-
-func (s *HybridStorage) Discard(key string, gids []string) error {
 	return fmt.Errorf("unsupported")
 }
 

@@ -103,10 +103,6 @@ func (s *mapWrapper) Merge(Storage) error {
 	return fmt.Errorf("unsupported")
 }
 
-func (s *mapWrapper) Discard(key string, gids []string) error {
-	return fmt.Errorf("unsupported")
-}
-
 func (s *mapWrapper) Accept(v *Value, seq int) error {
 	return fmt.Errorf("unsupported")
 }
