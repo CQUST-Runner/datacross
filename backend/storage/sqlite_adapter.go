@@ -234,18 +234,14 @@ func (s *SqliteAdapter) AllNodes() ([]*DBRecord, error) {
 	return records, nil
 }
 
-func (s *SqliteAdapter) Offsets() (map[string]*LogProcess, error) {
+func (s *SqliteAdapter) Processes() ([]*LogProcess, error) {
 
 	records := []*LogProcess{}
 	result := s.workingDB.Model(&LogProcess{}).Find(&records)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	offsets := make(map[string]*LogProcess)
-	for _, rec := range records {
-		offsets[rec.MachineID] = rec
-	}
-	return offsets, nil
+	return records, nil
 }
 
 func (s *SqliteAdapter) Merge(other ReadOnlyNodeStorage) error {

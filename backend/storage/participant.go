@@ -129,8 +129,14 @@ type LogProcessMgr struct {
 	m map[string]*LogProcess
 }
 
-func (m *LogProcessMgr) Init() {
+func (m *LogProcessMgr) Init(process ...*LogProcess) {
 	m.m = make(map[string]*LogProcess)
+	for _, p := range process {
+		if p == nil {
+			continue
+		}
+		m.Set(p.MachineID, p)
+	}
 }
 
 func (m *LogProcessMgr) Get(machineID string) *LogProcess {
@@ -161,10 +167,10 @@ type Participant struct {
 	lastSyncTime time.Time
 }
 
-func (s *Participant) runLogInputs() (inputs []*LogInput, retErr error) {
+func runLogInputs(network *NetworkInfo, m *LogProcessMgr) (inputs []*LogInput, retErr error) {
 	inputs = []*LogInput{}
-	for _, p := range s.network.participants {
-		var process LogProcess = *s.m.Get(p.name)
+	for _, p := range network.participants {
+		var process LogProcess = *m.Get(p.name)
 		w := Wal{}
 		err := w.Init(p.walFile, &BinLog{}, true)
 		if err != nil {
@@ -186,27 +192,27 @@ func (s *Participant) runLogInputs() (inputs []*LogInput, retErr error) {
 	return inputs, nil
 }
 
-func (s *Participant) runLog() error {
+func runLog(runner *LogRunner, network *NetworkInfo, m *LogProcessMgr) error {
 
-	inputs, err := s.runLogInputs()
+	inputs, err := runLogInputs(network, m)
 	if err != nil {
 		return err
 	}
 	// TODO inputs.Close
 
-	results, err := s.runner.Run(inputs...)
+	results, err := runner.Run(inputs...)
 	if err != nil {
 		return err
 	}
 
 	for machineID, process := range results.status {
-		s.m.Set(machineID, process)
+		m.Set(machineID, process)
 	}
 
 	return nil
 }
 
-func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, map[string]*LogProcess, error) {
+func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*LogProcess, error) {
 
 	ns := NodeStorageImpl{}
 	ns.Init()
@@ -218,7 +224,7 @@ func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, map[
 	}
 	defer sqlite.Close()
 
-	offsets, err := sqlite.Offsets()
+	offsets, err := sqlite.Processes()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -255,17 +261,13 @@ func (s *Participant) Init(wd string, machineID string) error {
 
 	me := network.Add(machineID)
 
-	m := LogProcessMgr{}
-	m.Init()
-
 	ns, offsets, err := s.newNodeStorageFromSqlite(me.dbFile)
 	if err != nil {
 		return err
 	}
 
-	for machineID, offset := range offsets {
-		m.Set(machineID, offset)
-	}
+	m := LogProcessMgr{}
+	m.Init(offsets...)
 
 	// os.Remove(me.dbFile)
 	// ns := SqliteAdapter{}
@@ -292,7 +294,40 @@ func (s *Participant) Init(wd string, machineID string) error {
 	return nil
 }
 
+func (s *Participant) persistToSqlite() error {
+	sqlite := SqliteAdapter{}
+	err := sqlite.Init(s.me.dbFile, "")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = sqlite.Close()
+		if err != nil {
+			logger.Error("close sqlite failed[%v]", err)
+		}
+	}()
+
+	processes, err := sqlite.Processes()
+	if err != nil {
+		return err
+	}
+	m := LogProcessMgr{}
+	m.Init(processes...)
+
+	runner := LogRunner{}
+	err = runner.Init(s.machineID, &sqlite)
+	if err != nil {
+		return err
+	}
+	return runLog(&runner, s.network, &m)
+}
+
 func (s *Participant) Close() {
+	logger.Info("persist to sqlite...")
+	err := s.persistToSqlite()
+	if err != nil {
+		logger.Error("persist to sqlite failed[%v]", err)
+	}
 }
 
 func (s *Participant) WithCommitID(string) Storage {
@@ -304,7 +339,7 @@ func (s *Participant) WithMachineID(string) Storage {
 }
 
 func (s *Participant) Save(key string, value string) error {
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return err
 	}
 
@@ -361,7 +396,7 @@ func (s *Participant) Save(key string, value string) error {
 
 func (s *Participant) Del(key string) error {
 
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return err
 	}
 
@@ -399,7 +434,7 @@ func (s *Participant) Del(key string) error {
 
 func (s *Participant) Has(key string) (bool, error) {
 
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return false, err
 	}
 
@@ -424,7 +459,7 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 
 func (s *Participant) Load(key string) (*Value, error) {
 
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return nil, err
 	}
 
@@ -447,7 +482,7 @@ func (s *Participant) Load(key string) (*Value, error) {
 
 func (s *Participant) All() ([]*Value, error) {
 
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return nil, err
 	}
 
@@ -502,7 +537,7 @@ func (s *Participant) discard(gid string) error {
 
 func (s *Participant) Accept(v *Value, seq int) error {
 
-	if err := s.runLog(); err != nil {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
 		return err
 	}
 
