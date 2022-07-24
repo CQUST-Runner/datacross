@@ -237,6 +237,20 @@ func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*L
 	return &ns, offsets, nil
 }
 
+func (s *Participant) runLogTillEnd() error {
+	if err := runLog(s.runner, s.network, s.m); err != nil {
+		return err
+	}
+	offset, err := s.w.Offset()
+	if err != nil {
+		return err
+	}
+	if s.m.Get(s.machineID).Offset != offset {
+		return fmt.Errorf("log process is not yet end")
+	}
+	return nil
+}
+
 func (s *Participant) Init(wd string, machineID string) error {
 	if !path.IsAbs(wd) && !(len(wd) > 1 && wd[1] == ':') {
 		cwd, err := os.Getwd()
@@ -339,7 +353,7 @@ func (s *Participant) WithMachineID(string) Storage {
 }
 
 func (s *Participant) Save(key string, value string) error {
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return err
 	}
 
@@ -396,7 +410,7 @@ func (s *Participant) Save(key string, value string) error {
 
 func (s *Participant) Del(key string) error {
 
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return err
 	}
 
@@ -434,7 +448,7 @@ func (s *Participant) Del(key string) error {
 
 func (s *Participant) Has(key string) (bool, error) {
 
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return false, err
 	}
 
@@ -459,7 +473,7 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 
 func (s *Participant) Load(key string) (*Value, error) {
 
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return nil, err
 	}
 
@@ -482,7 +496,7 @@ func (s *Participant) Load(key string) (*Value, error) {
 
 func (s *Participant) All() ([]*Value, error) {
 
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return nil, err
 	}
 
@@ -537,7 +551,7 @@ func (s *Participant) discard(gid string) error {
 
 func (s *Participant) Accept(v *Value, seq int) error {
 
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+	if err := s.runLogTillEnd(); err != nil {
 		return err
 	}
 

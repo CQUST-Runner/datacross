@@ -70,3 +70,11 @@ func (w *WalHelper) Append(logOp *LogOperation) (string, int64, error) {
 
 	return gid, num, nil
 }
+
+func (w *WalHelper) Offset() (int64, error) {
+	wal, err := w.getW()
+	if err != nil {
+		return 0, err
+	}
+	return wal.Offset(), nil
+}
