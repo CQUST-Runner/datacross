@@ -11,64 +11,6 @@ type LogInput struct {
 	process   *LogProcess
 }
 
-type ChangeList struct {
-	newRecords []*DBRecord
-	changeList map[string]*DBRecord
-	lasts      map[string]struct{}
-}
-
-func (c *ChangeList) Init() {
-	c.changeList = map[string]*DBRecord{}
-	c.lasts = make(map[string]struct{})
-}
-
-func (c *ChangeList) UpdateChangeList(old *DBRecord, new *DBRecord) error {
-	if old == nil {
-		c.newRecords = append(c.newRecords, new)
-		return nil
-	}
-
-	if new.Key != old.Key {
-		return fmt.Errorf("old key and new key must be the same")
-	}
-	if new.PrevLogGid != old.CurrentLogGid {
-		return fmt.Errorf("new record must be a follower of the old record")
-	}
-
-	if _, ok := c.changeList[old.CurrentLogGid]; !ok {
-		c.changeList[old.CurrentLogGid] = old
-		c.changeList[new.CurrentLogGid] = new
-		c.lasts[new.CurrentLogGid] = struct{}{}
-	} else {
-		c.changeList[new.CurrentLogGid] = new
-		delete(c.lasts, old.CurrentLogGid)
-		c.lasts[new.CurrentLogGid] = struct{}{}
-	}
-	return nil
-}
-
-func (c *ChangeList) NewRecords() []*DBRecord {
-	return c.newRecords
-}
-
-func (c *ChangeList) ChangedRecords() [][]*DBRecord {
-	result := [][]*DBRecord{}
-	for gid := range c.lasts {
-		history := []*DBRecord{}
-		for {
-			record, ok := c.changeList[gid]
-			if !ok {
-				break
-			}
-			// must be slow!!!
-			history = append([]*DBRecord{record}, history...)
-			gid = record.PrevLogGid
-		}
-		result = append(result, history)
-	}
-	return result
-}
-
 type RunLogError struct {
 	errs []error
 }
@@ -85,20 +27,13 @@ func (e *RunLogError) Error() string {
 }
 
 type RunLogResult struct {
-	changeList *ChangeList
-
 	status map[string]*LogProcess
 	err    *RunLogError
 }
 
-func (r *RunLogResult) Init(l *ChangeList, s map[string]*LogProcess, e *RunLogError) {
-	r.changeList = l
+func (r *RunLogResult) Init(s map[string]*LogProcess, e *RunLogError) {
 	r.status = s
 	r.err = e
-}
-
-func (r *RunLogResult) ChangeList() *ChangeList {
-	return r.changeList
 }
 
 func (r *RunLogResult) Position(machineID string) string {
@@ -122,15 +57,11 @@ type RunLogWorker struct {
 }
 
 type RunLogContext struct {
-	workers    map[string]*RunLogWorker
-	changeList *ChangeList
+	workers map[string]*RunLogWorker
 }
 
 func (c *RunLogContext) Init(i ...*LogInput) error {
 	c.workers = make(map[string]*RunLogWorker)
-	changeList := ChangeList{}
-	changeList.Init()
-	c.changeList = &changeList
 
 	for _, input := range i {
 		if input == nil {
@@ -179,8 +110,6 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 			Num:                logOp.Num,
 			PrevNum:            logOp.PrevNum,
 		}
-		// TODO handle error
-		c.changeList.UpdateChangeList(nil, &record)
 		err := r.s.Add(&record)
 		if err != nil {
 			logger.Error("add leaf[%v] [%v] failed[%v]", record.Key, record.CurrentLogGid, err)
@@ -213,8 +142,6 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 			Num:                logOp.Num,
 			PrevNum:            logOp.PrevNum,
 		}
-		// TODO handle error
-		c.changeList.UpdateChangeList(parent, &record)
 		err := r.s.Replace(parent.CurrentLogGid, &record)
 		if err != nil {
 			logger.Error("update leaf of [%v] [%v]->[%v] failed", parent.Key, parent.CurrentLogGid, record.CurrentLogGid)
@@ -238,8 +165,6 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 		Num:                logOp.Num,
 		PrevNum:            logOp.PrevNum,
 	}
-	// TODO handle error
-	c.changeList.UpdateChangeList(nil, &record)
 	err = r.s.Add(&record)
 	if err != nil {
 		logger.Error("add leaf of key[%v] [%v] failed", record.Key, record.CurrentLogGid)
@@ -306,7 +231,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 		}
 	}
 
-	result := RunLogResult{status: make(map[string]*LogProcess), changeList: c.changeList}
+	result := RunLogResult{status: make(map[string]*LogProcess)}
 	for _, worker := range c.workers {
 		if worker.err != nil {
 			if result.err == nil {

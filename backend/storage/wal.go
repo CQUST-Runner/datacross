@@ -247,69 +247,6 @@ func (w *Wal) AppendRaw(logOp ...*LogOperation) error {
 	return nil
 }
 
-func execLogEntry(logOp *LogOperation, s Storage) error {
-	switch logOp.Op {
-	case int32(Op_Del):
-		return s.Del(logOp.Key)
-	case int32(Op_Modify):
-		return s.Save(logOp.Key, logOp.Value)
-	case int32(Op_Discard):
-		return fmt.Errorf("unsupported op[%v]", logOp.Op)
-	case int32(Op_None):
-		return fmt.Errorf("unrecognized op[%v]", logOp.Op)
-	default:
-		return fmt.Errorf("unrecognized op[%v]", logOp.Op)
-	}
-}
-
-func foreach(w *Wal, perEntry bool, do func(pos int64, entry *LogEntry, index int) bool) error {
-	var pos int64 = HeaderSize
-	for pos < w.header.FileEnd {
-		entry := new(LogEntry)
-		readSz, err := w.l.ReadEntry(w.f, pos, entry)
-		if err != nil {
-			return err
-		}
-		if readSz <= 0 {
-			return fmt.Errorf("read size unexpected")
-		}
-
-		term := false
-		if !perEntry {
-			for index, logOp := range entry.Ops {
-				if logOp == nil {
-					continue
-				}
-				if !do(pos, entry, index) {
-					term = true
-					break
-				}
-			}
-		} else {
-			term = !do(pos, entry, 0)
-		}
-		if term {
-			break
-		}
-		pos += readSz
-	}
-	return nil
-}
-
-// Replay start not included
-func (w *Wal) Replay(s Storage, start string) error {
-	if w.broken {
-		return fmt.Errorf("wal is broken")
-	}
-	return foreachIn(w, func(_ int64, entry *LogEntry, index int) bool {
-		err := execLogEntry(entry.Ops[index], s)
-		if err != nil {
-			return false
-		}
-		return true
-	}, start, "")
-}
-
 func (w *Wal) Flush() error {
 	if w.broken {
 		return fmt.Errorf("wal is broken")
@@ -319,69 +256,6 @@ func (w *Wal) Flush() error {
 	}
 
 	return w.f.Flush()
-}
-
-func (w *Wal) Foreach(do func(logOp *LogOperation) bool) error {
-	return foreach(w, false, func(_ int64, entry *LogEntry, index int) bool {
-		return do(entry.Ops[index])
-	})
-}
-
-func foreachInInternal(w *Wal, do func(pos int64, entry *LogEntry, index int) bool, start string, end string, includeStart bool, includeEnd bool) error {
-	preInRange := false
-	preOutRange := false
-	inRange := len(start) == 0
-	var e error
-	err := foreach(w, false, func(pos int64, entry *LogEntry, index int) bool {
-		logOp := entry.Ops[index]
-		if preInRange {
-			inRange = true
-			preInRange = false
-		}
-		if preOutRange {
-			inRange = false
-			return false
-		}
-
-		if len(start) > 0 && logOp.Gid == start {
-			if includeStart {
-				inRange = true
-			} else {
-				preInRange = true
-			}
-		}
-		if len(end) > 0 && logOp.Gid == end && inRange {
-			if includeEnd {
-				preOutRange = true
-			} else {
-				inRange = false
-				return false
-			}
-		}
-
-		if inRange {
-			if !do(pos, entry, index) {
-				return false
-			}
-		}
-		return true
-	})
-
-	if err != nil {
-		return err
-	}
-	return e
-}
-
-// with includeStart, includeEnd = false, false
-func foreachIn(w *Wal, do func(pos int64, entry *LogEntry, index int) bool, start string, end string) error {
-	return foreachInInternal(w, do, start, end, false, false)
-}
-
-func (w *Wal) Range(start string, end string, do func(logOp *LogOperation) bool) error {
-	return foreachIn(w, func(_ int64, entry *LogEntry, index int) bool {
-		return do(entry.Ops[index])
-	}, start, end)
 }
 
 func (w *Wal) Iterator() *WalIterator {
