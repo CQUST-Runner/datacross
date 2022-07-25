@@ -1,11 +1,47 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"time"
+
+	glog "gorm.io/gorm/logger"
 )
+
+type gormLoggerImpl struct {
+	logger Logger
+}
+
+func (l *gormLoggerImpl) LogMode(lvl glog.LogLevel) glog.Interface {
+	switch lvl {
+	case glog.Silent:
+		return &gormLoggerImpl{logger: newLogger(ioutil.Discard, "GORM")}
+	default:
+		return l
+	}
+}
+
+func (l *gormLoggerImpl) Info(c context.Context, fmt string, args ...interface{}) {
+	l.logger.Info(fmt, args...)
+}
+
+func (l *gormLoggerImpl) Warn(c context.Context, fmt string, args ...interface{}) {
+	l.logger.Warn(fmt, args...)
+}
+
+func (l *gormLoggerImpl) Error(c context.Context, fmt string, args ...interface{}) {
+	l.logger.Error(fmt, args...)
+}
+
+func (l *gormLoggerImpl) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+	elapsed := time.Since(begin)
+	sql, rows := fc()
+	l.logger.Info("sql: %v, rowsAffected: %v, elapsed: %vms, err: %v", sql, rows, elapsed.Milliseconds(), err)
+}
 
 type Logger interface {
 	Category(catetory string) Logger

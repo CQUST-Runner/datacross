@@ -104,6 +104,7 @@ func (s *SqliteAdapter) Transaction(f func(s *SqliteAdapter) error) error {
 func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{
 		SkipDefaultTransaction: true,
+		Logger:                 &gormLoggerImpl{logger: logger.Category("GORM")},
 	})
 	if err != nil {
 		return err
