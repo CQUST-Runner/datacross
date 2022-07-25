@@ -1,4 +1,6 @@
-# Passively Synchronizing Eventual-Consistency Storage
+# DataCross
+
+A Passively Synchronizing Eventual-Consistency Storage
 
 不依赖中心的数据同步服务，要同步数据可以将数据目录设置到同步盘
 
