@@ -1,9 +1,10 @@
 package main
 
 import (
-	"dataacross/storage"
 	"flag"
 	"fmt"
+
+	"github.com/CQUST-Runner/datacross/storage"
 )
 
 func main() {

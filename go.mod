@@ -1,4 +1,4 @@
-module dataacross
+module github.com/CQUST-Runner/datacross
 
 go 1.18
 
