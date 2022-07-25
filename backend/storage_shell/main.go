@@ -11,7 +11,6 @@ import (
 )
 
 type Config struct {
-	// TODO: default not working
 	WorkingDirectory string `yaml:"wd" default:"./data"`
 	MachineName      string `yaml:"machine_name" default:"machine0"`
 }

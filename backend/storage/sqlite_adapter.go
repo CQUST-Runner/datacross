@@ -30,19 +30,20 @@ func (n ChangeCount) Value() (driver.Value, error) {
 	return json.Marshal(n)
 }
 
+// TODO able to open sqlite for readonly?
+
 // is_deleted || is_discarded can be removed from storage any time
 type DBRecord struct {
-	Key           string `gorm:"column:key"`
-	Value         string `gorm:"column:value"`
-	MachineID     string `gorm:"column:machine_id"`
-	Offset        int64  `gorm:"column:offset"`
-	PrevMachineID string `gorm:"column:prev_machine_id"`
-	Seq           uint64 `gorm:"column:seq"`
-	CurrentLogGid string `gorm:"column:gid"`
-	PrevLogGid    string `gorm:"column:prev_log_gid"`
-	IsDiscarded   bool   `gorm:"column:is_discarded"`
-	IsDeleted     bool   `gorm:"column:is_deleted"`
-	// TODO: 日志填写changes字段
+	Key                string `gorm:"column:key"`
+	Value              string `gorm:"column:value"`
+	MachineID          string `gorm:"column:machine_id"`
+	Offset             int64  `gorm:"column:offset"`
+	PrevMachineID      string `gorm:"column:prev_machine_id"`
+	Seq                uint64 `gorm:"column:seq"`
+	CurrentLogGid      string `gorm:"column:gid"`
+	PrevLogGid         string `gorm:"column:prev_log_gid"`
+	IsDiscarded        bool   `gorm:"column:is_discarded"`
+	IsDeleted          bool   `gorm:"column:is_deleted"`
 	MachineChangeCount ChangeCount
 	Num                int64 `gorm:"num"`
 	PrevNum            int64 `gorm:"prev_num"`

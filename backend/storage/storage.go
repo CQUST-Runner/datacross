@@ -161,7 +161,5 @@ type Storage interface {
 	Has(key string) (bool, error)
 	Load(key string) (val *Value, err error)
 	All() ([]*Value, error)
-	// Merge merges s into self, for duplicate keys, our side take precedence
-	Merge(s Storage) error
 	Accept(v *Value, seq int) error
 }

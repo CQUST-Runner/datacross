@@ -120,11 +120,6 @@ func getDBFilePath(personalPath string) string {
 	return dbFile
 }
 
-// TODO log format converter
-// TODO command line db tool
-// TODO background syncing, thread safety?
-// TODO set json flag to output single line json
-
 type LogProcessMgr struct {
 	m map[string]*LogProcess
 }
@@ -588,10 +583,6 @@ func (s *Participant) AllConflicts() ([]*Value, error) {
 		}
 	}
 	return results, nil
-}
-
-func (s *Participant) Merge(Storage) error {
-	return fmt.Errorf("unsupported")
 }
 
 func _() {

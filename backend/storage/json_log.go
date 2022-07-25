@@ -8,6 +8,8 @@ import (
 	"io"
 )
 
+// TODO set json flag to output single line json
+
 type JsonLog struct {
 }
 
