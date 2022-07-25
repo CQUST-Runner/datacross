@@ -17,36 +17,42 @@ type ParticipantInfo struct {
 	network *NetworkInfo
 }
 
-func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo) error {
-	personalPath := getPersonalPath(wd, name)
-	walPath := getWalFilePath(personalPath)
-	dbPath := getDBFilePath(personalPath)
+func initParticipant(wd string, name string, network *NetworkInfo) (*ParticipantInfo, error) {
+	p := ParticipantInfo{}
+	p.Init(wd, name, network)
 
-	if !IsDir(personalPath) {
-		err := os.MkdirAll(personalPath, 0777)
+	if !IsDir(p.personalPath) {
+		err := os.MkdirAll(p.personalPath, 0777)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	if !IsFile(walPath) {
+	if !IsFile(p.walFile) {
 		w := Wal{}
-		err := w.Init(walPath, &BinLog{}, false)
+		err := w.Init(p.walFile, &BinLog{}, false)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = w.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
+
+	return &p, nil
+}
+
+func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo) {
+	personalPath := getPersonalPath(wd, name)
+	walPath := getWalFilePath(personalPath)
+	dbPath := getDBFilePath(personalPath)
 
 	p.name = name
 	p.personalPath = personalPath
 	p.walFile = walPath
 	p.dbFile = dbPath
 	p.network = n
-	return nil
 }
 
 type NetworkInfo struct {
@@ -62,7 +68,7 @@ func (n *NetworkInfo) Init(wd string) error {
 	participants := map[string]*ParticipantInfo{}
 	for _, name := range all {
 		p := ParticipantInfo{}
-		_ = p.Init(wd, name, n)
+		p.Init(wd, name, n)
 		participants[name] = &p
 	}
 
@@ -75,10 +81,8 @@ func (n *NetworkInfo) Init(wd string) error {
 func (n *NetworkInfo) Add(name string) *ParticipantInfo {
 	if _, ok := n.participants[name]; !ok {
 		p := ParticipantInfo{}
-		// TODO: handle error
-		_ = p.Init(n.wd, name, n)
+		p.Init(n.wd, name, n)
 		n.participants[name] = &p
-
 	}
 	return n.participants[name]
 }
@@ -268,6 +272,10 @@ func (s *Participant) Init(wd string, machineID string) error {
 		return err
 	}
 
+	_, err = initParticipant(wd, machineID, &network)
+	if err != nil {
+		return err
+	}
 	me := network.Add(machineID)
 
 	ns, offsets, err := s.newNodeStorageFromSqlite(me.dbFile)
