@@ -16,6 +16,10 @@ type gormLoggerImpl struct {
 	logger Logger
 }
 
+func (l *gormLoggerImpl) Init(logger Logger) {
+	l.logger = logger.AddSkip(1)
+}
+
 func (l *gormLoggerImpl) LogMode(lvl glog.LogLevel) glog.Interface {
 	switch lvl {
 	case glog.Silent:
@@ -45,15 +49,17 @@ func (l *gormLoggerImpl) Trace(ctx context.Context, begin time.Time, fc func() (
 
 type Logger interface {
 	Category(catetory string) Logger
+	AddSkip(skip int) Logger
 	Warn(format string, args ...interface{})
 	Error(format string, args ...interface{})
 	Info(format string, args ...interface{})
 }
 
 type builtinLoggerAdapter struct {
-	l   *log.Logger
-	cat string
-	out io.Writer
+	l         *log.Logger
+	cat       string
+	out       io.Writer
+	extraSkip int
 }
 
 func newLogger(out io.Writer, cat string) *builtinLoggerAdapter {
@@ -69,16 +75,22 @@ func (a *builtinLoggerAdapter) Category(catetory string) Logger {
 	return newLogger(a.out, catetory)
 }
 
+func (a *builtinLoggerAdapter) AddSkip(skip int) Logger {
+	l := newLogger(a.out, a.cat)
+	l.extraSkip = a.extraSkip + skip
+	return l
+}
+
 func (a *builtinLoggerAdapter) Warn(format string, args ...interface{}) {
-	_ = a.l.Output(2, fmt.Sprintf(" WARN "+format, args...))
+	_ = a.l.Output(2+a.extraSkip, fmt.Sprintf(" WARN "+format, args...))
 }
 
 func (a *builtinLoggerAdapter) Error(format string, args ...interface{}) {
-	_ = a.l.Output(2, fmt.Sprintf(" ERROR "+format, args...))
+	_ = a.l.Output(2+a.extraSkip, fmt.Sprintf(" ERROR "+format, args...))
 }
 
 func (a *builtinLoggerAdapter) Info(format string, args ...interface{}) {
-	_ = a.l.Output(2, fmt.Sprintf(" INFO "+format, args...))
+	_ = a.l.Output(2+a.extraSkip, fmt.Sprintf(" INFO "+format, args...))
 }
 
 var logger Logger = newLogger(os.Stdout, "Core")
