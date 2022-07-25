@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -46,4 +47,16 @@ func IsDir(filename string) bool {
 		return false
 	}
 	return stat.Mode().IsDir()
+}
+
+func ToAbs(p string) (string, error) {
+	if !path.IsAbs(p) && !(len(p) > 1 && p[1] == ':') {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		p = path.Join(cwd, p)
+	}
+	p = path.Clean(p)
+	return p, nil
 }

@@ -90,18 +90,16 @@ func (r *DBRecord) AddChange(machineID string, changes int32) map[string]int32 {
 // SqliteAdapter ...
 type SqliteAdapter struct {
 	db        *gorm.DB
-	tableName string
-
 	workingDB *gorm.DB
 }
 
 func (s *SqliteAdapter) Transaction(f func(s *SqliteAdapter) error) error {
 	return s.workingDB.Transaction(func(tx *gorm.DB) error {
-		return f(&SqliteAdapter{db: s.db, tableName: s.tableName, workingDB: tx})
+		return f(&SqliteAdapter{db: s.db, workingDB: tx})
 	})
 }
 
-func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
+func (s *SqliteAdapter) Init(dbFile string) error {
 	l := gormLoggerImpl{}
 	l.Init(logger)
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{
@@ -122,8 +120,6 @@ func (s *SqliteAdapter) Init(dbFile string, tableName string) error {
 	}
 
 	s.db = db
-	s.tableName = tableName
-	// s.workingDB = db.Model(&DBRecord{}).Table(tableName)
 	s.workingDB = db
 	return nil
 }
