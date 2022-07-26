@@ -31,12 +31,13 @@ func (w *WalHelper) check() {
 		if w.w != nil {
 			if err := w.w.Flush(); err != nil {
 				logger.Error("flush wal failed[%v]", err)
+				return
 			}
 			if err := w.w.Close(); err != nil {
 				logger.Error("close wal failed[%v]", err)
-			} else {
-				w.w = nil
+				return
 			}
+			w.w = nil
 		}
 		w.count = 0
 	}

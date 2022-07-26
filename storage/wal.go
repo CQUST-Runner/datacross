@@ -11,14 +11,14 @@ type Iterator interface {
 }
 
 type WalIterator struct {
-	w     *Wal
-	pos   int64
-	entry *LogEntry
-	index int
+	w      *Wal
+	pos    int64
+	endPos int64 //const
+	entry  *LogEntry
+	index  int
 
 	stoped bool
 
-	preStop    bool
 	end        string
 	includeEnd bool
 }
@@ -26,6 +26,7 @@ type WalIterator struct {
 func (i *WalIterator) Init(w *Wal) {
 	i.w = w
 	i.pos = HeaderSize
+	i.endPos = w.header.FileEnd
 	i.entry = nil
 	i.index = 0
 }
@@ -36,6 +37,7 @@ func (i *WalIterator) InitWithOffset(w *Wal, offset int64) {
 	}
 	i.w = w
 	i.pos = offset
+	i.endPos = w.header.FileEnd
 	i.entry = nil
 	i.index = 0
 }
@@ -44,20 +46,17 @@ func (i *WalIterator) Next() (hasNext bool) {
 	if i.stoped {
 		return false
 	}
-	if i.preStop {
-		return false
-	}
 	defer func() {
 		if hasNext {
 			if len(i.end) > 0 && i.LogOp().Gid == i.end {
 				if i.includeEnd {
-					i.preStop = true
+					i.stoped = true
 				} else {
 					hasNext = false
+					i.stoped = true
 				}
 			}
-		}
-		if !hasNext {
+		} else {
 			i.stoped = true
 		}
 	}()
@@ -67,7 +66,7 @@ func (i *WalIterator) Next() (hasNext bool) {
 	}
 
 	var entry *LogEntry = nil
-	for i.pos < i.w.header.FileEnd {
+	for i.pos < i.endPos {
 		tmp := LogEntry{}
 		readSz, err := i.w.l.ReadEntry(i.w.f, i.pos, &tmp)
 		if err != nil {
@@ -113,11 +112,19 @@ type Wal struct {
 	readonly bool
 }
 
-func (w *Wal) Init(filename string, l LogFormat, readonly bool) error {
+func (w *Wal) Init(filename string, l LogFormat, readonly bool) (err error) {
 	f, err := OpenFile(filename, readonly)
 	if err != nil {
 		return err
 	}
+	defer func(f File) {
+		if err != nil {
+			e := f.Close()
+			if e != nil {
+				logger.Error("close wal file failed[%v]", e)
+			}
+		}
+	}(f)
 
 	valid, err := l.IsValidFile(f)
 	if err != nil {
@@ -163,10 +170,6 @@ func (w *Wal) Close() error {
 		return err
 	}
 	w.f = nil
-	w.header = nil
-	w.broken = false
-	w.l = nil
-	w.pos = 0
 	return nil
 }
 
@@ -176,6 +179,7 @@ func (w *Wal) Offset() int64 {
 
 // Append multiple operations will be appended as a single log entry
 // returns the gid of the last operation
+// generate and populate .Num, .Gid for each operation
 func (w *Wal) Append(logOp ...*LogOperation) (string, int64, error) {
 	if w.broken {
 		return "", 0, fmt.Errorf("wal is broken")
@@ -189,7 +193,6 @@ func (w *Wal) Append(logOp ...*LogOperation) (string, int64, error) {
 
 	gids := make([]string, len(logOp))
 	for i := range gids {
-
 		gid, err := GenUUID()
 		if err != nil {
 			return "", 0, err
@@ -236,7 +239,6 @@ func (w *Wal) AppendRaw(logOp ...*LogOperation) error {
 	newHeader.LastEntryId = logOp[len(logOp)-1].Gid
 	newHeader.EntryNum += int64(len(logOp))
 	err = w.l.WriteHeader(w.f, newHeader)
-	// This should not be happen
 	if err != nil {
 		w.broken = true
 		return err

@@ -123,13 +123,13 @@ func getDBFilePath(personalPath string) string {
 	return dbFile
 }
 
-type LogProcessMgr struct {
-	m map[string]*LogProcess
+type LogProgressMgr struct {
+	m map[string]*LogProgress
 }
 
-func (m *LogProcessMgr) Init(process ...*LogProcess) {
-	m.m = make(map[string]*LogProcess)
-	for _, p := range process {
+func (m *LogProgressMgr) Init(progress ...*LogProgress) {
+	m.m = make(map[string]*LogProgress)
+	for _, p := range progress {
 		if p == nil {
 			continue
 		}
@@ -137,23 +137,23 @@ func (m *LogProcessMgr) Init(process ...*LogProcess) {
 	}
 }
 
-func (m *LogProcessMgr) Get(machineID string) *LogProcess {
+func (m *LogProgressMgr) Get(machineID string) *LogProgress {
 	if p, ok := m.m[machineID]; ok {
 		return p
 	}
-	p := LogProcess{Offset: HeaderSize}
+	p := LogProgress{Offset: HeaderSize}
 	m.m[machineID] = &p
 	return &p
 }
 
-func (m *LogProcessMgr) Set(machineID string, process *LogProcess) {
-	m.m[machineID] = process
+func (m *LogProgressMgr) Set(machineID string, progress *LogProgress) {
+	m.m[machineID] = progress
 }
 
 // Participant ...
 type Participant struct {
 	network *NetworkInfo
-	m       *LogProcessMgr
+	m       *LogProgressMgr
 	me      *ParticipantInfo
 
 	w      *WalHelper
@@ -164,10 +164,10 @@ type Participant struct {
 	lastSyncTime time.Time
 }
 
-func makeRunLogInputs(network *NetworkInfo, m *LogProcessMgr) (inputs []*LogInput, retErr error) {
+func makeRunLogInputs(network *NetworkInfo, m *LogProgressMgr) (inputs []*LogInput, retErr error) {
 	inputs = []*LogInput{}
 	for _, p := range network.participants {
-		var process LogProcess = *m.Get(p.name)
+		var progress LogProgress = *m.Get(p.name)
 		w := Wal{}
 		err := w.Init(p.walFile, &BinLog{}, true)
 		if err != nil {
@@ -184,7 +184,7 @@ func makeRunLogInputs(network *NetworkInfo, m *LogProcessMgr) (inputs []*LogInpu
 
 		inputs = append(inputs, &LogInput{
 			machineID: p.name, w: &w,
-			process: &process})
+			progress: &progress})
 	}
 	return inputs, nil
 }
@@ -205,7 +205,7 @@ func closeRunLogInputs(inputs ...*LogInput) {
 	}
 }
 
-func runLog(runner *LogRunner, network *NetworkInfo, m *LogProcessMgr) error {
+func runLog(runner *LogRunner, network *NetworkInfo, m *LogProgressMgr) error {
 	inputs, err := makeRunLogInputs(network, m)
 	if err != nil {
 		return err
@@ -218,13 +218,13 @@ func runLog(runner *LogRunner, network *NetworkInfo, m *LogProcessMgr) error {
 	if err != nil {
 		return err
 	}
-	for machineID, process := range results.status {
-		m.Set(machineID, process)
+	for machineID, progress := range results.status {
+		m.Set(machineID, progress)
 	}
 	return nil
 }
 
-func (p *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*LogProcess, error) {
+func (p *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*LogProgress, error) {
 	ns := NodeStorageImpl{}
 	ns.Init()
 
@@ -257,7 +257,7 @@ func (p *Participant) runLogTillEnd() error {
 		return err
 	}
 	if p.m.Get(p.me.name).Offset != offset {
-		return fmt.Errorf("log process is not yet end")
+		return fmt.Errorf("log progress is not yet end")
 	}
 	return nil
 }
@@ -291,7 +291,7 @@ func (p *Participant) Init(wd string, machineID string) (err error) {
 	if err != nil {
 		return err
 	}
-	m := LogProcessMgr{}
+	m := LogProgressMgr{}
 	m.Init(offsets...)
 
 	runner := LogRunner{}
@@ -334,7 +334,7 @@ func (p *Participant) persistToSqlite() error {
 	if err != nil {
 		return err
 	}
-	m := LogProcessMgr{}
+	m := LogProgressMgr{}
 	m.Init(processes...)
 
 	runner := LogRunner{}

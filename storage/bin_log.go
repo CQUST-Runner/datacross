@@ -28,7 +28,9 @@ func (l *BinLog) WriteHeader(f File, header *FileHeader) error {
 	if err != nil {
 		return err
 	}
-	_ = n
+	if n != header.Size() {
+		return fmt.Errorf("write size unexpected")
+	}
 
 	n, err = f.Write(headBuffer[:])
 	if err != nil {
@@ -125,7 +127,7 @@ func (l *BinLog) AppendEntry(f File, pos int64, entry *LogEntry) (int64, error) 
 		return 0, fmt.Errorf("log entry too large")
 	}
 	entryBuffer := make([]byte, writeSize)
-	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : 4+entry.Size()])
+	_, err = entry.MarshalToSizedBuffer(entryBuffer[4 : 4+sz])
 	if err != nil {
 		return 0, err
 	}
@@ -160,7 +162,9 @@ func (l *BinLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 
 	size := binary.LittleEndian.Uint32(sizeBuffer[:])
 	if size == 0 {
-		return 4, nil
+		entry.Reset()
+		// size+crc
+		return 4 + 4, nil
 	}
 
 	entryBuffer := make([]byte, size)

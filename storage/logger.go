@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -23,7 +22,7 @@ func (l *gormLoggerImpl) Init(logger Logger) {
 func (l *gormLoggerImpl) LogMode(lvl glog.LogLevel) glog.Interface {
 	switch lvl {
 	case glog.Silent:
-		return &gormLoggerImpl{logger: newLogger(ioutil.Discard, "GORM", 1, Error)}
+		return &gormLoggerImpl{logger: l.logger.SetLevel(Silent)}
 	default:
 		return l
 	}

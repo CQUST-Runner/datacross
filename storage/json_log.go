@@ -133,8 +133,7 @@ func (l *JsonLog) ReadEntry(f File, pos int64, entry *LogEntry) (int64, error) {
 	readSz := len(jDoc)
 	// won't be 0
 	if len(jDoc) <= 1 {
-		entry.Reset()
-		return int64(readSz), nil
+		return 0, fmt.Errorf("read size unexpected")
 	}
 	jDoc = jDoc[:len(jDoc)-1]
 	err = json.Unmarshal(jDoc, entry)
