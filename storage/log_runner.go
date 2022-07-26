@@ -8,7 +8,7 @@ import (
 type LogInput struct {
 	machineID string
 	w         *Wal
-	process   *LogProcess
+	progress  *LogProgress
 }
 
 type RunLogError struct {
@@ -27,32 +27,32 @@ func (e *RunLogError) Error() string {
 }
 
 type RunLogResult struct {
-	status map[string]*LogProcess
+	status map[string]*LogProgress
 	err    *RunLogError
 }
 
-func (r *RunLogResult) Init(s map[string]*LogProcess, e *RunLogError) {
+func (r *RunLogResult) Init(s map[string]*LogProgress, e *RunLogError) {
 	r.status = s
 	r.err = e
-}
-
-func (r *RunLogResult) Position(machineID string) string {
-	if pos, ok := r.status[machineID]; ok {
-		return pos.Gid
-	}
-	return ""
 }
 
 func (r *RunLogResult) Error() error {
 	return r.err
 }
 
+func (r *RunLogResult) Process(machineID string) *LogProgress {
+	if progress, ok := r.status[machineID]; ok {
+		return progress
+	}
+	return newLogProgress(machineID)
+}
+
 type RunLogWorker struct {
 	input            *LogInput
-	process          *LogProcess
+	progress         *LogProgress
 	err              error
 	pendingOp        *LogOperation
-	pendingOpProcess *LogProcess
+	pendingOpProcess *LogProgress
 	it               *WalIterator
 }
 
@@ -60,28 +60,27 @@ type RunLogContext struct {
 	workers map[string]*RunLogWorker
 }
 
-func (c *RunLogContext) Init(i ...*LogInput) error {
+func (c *RunLogContext) Init(i ...*LogInput) {
 	c.workers = make(map[string]*RunLogWorker)
 
 	for _, input := range i {
 		if input == nil {
 			continue
 		}
-		it := input.w.IteratorOffset(input.process.Offset)
+		it := input.w.IteratorOffset(input.progress.Offset)
 		c.workers[input.machineID] = &RunLogWorker{
-			input:   input,
-			process: input.process,
-			it:      it,
+			input:    input,
+			progress: input.progress,
+			it:       it,
 		}
 	}
-	return nil
 }
 
-func (c *RunLogContext) Progress(machineID string) int64 {
+func (c *RunLogContext) Progress(machineID string) *LogProgress {
 	if w, ok := c.workers[machineID]; ok {
-		return w.process.Num
+		return w.progress
 	}
-	return 0
+	return newLogProgress(machineID)
 }
 
 type LogRunner struct {
@@ -95,18 +94,20 @@ func (r *LogRunner) Init(machineID string, s NodeStorage) error {
 	return nil
 }
 
-func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *LogOperation) bool {
+func (r *LogRunner) runLogInner(c *RunLogContext, progress *LogProgress, logOp *LogOperation) bool {
 	if logOp.PrevNum == 0 {
 		record := DBRecord{
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
-			Offset:             process.Offset,
+			PrevMachineID:      "",
+			Offset:             progress.Offset,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
+			PrevLogGid:         "",
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
-			MachineChangeCount: map[string]int32{logOp.MachineId: 1},
+			MachineChangeCount: logOp.Changes,
 			Num:                logOp.Num,
 			PrevNum:            logOp.PrevNum,
 		}
@@ -118,7 +119,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 		return true
 	}
 
-	if logOp.PrevNum > c.Progress(logOp.PrevMachineId) {
+	if logOp.PrevNum > c.Progress(logOp.PrevMachineId).Num {
 		return false
 	}
 
@@ -131,11 +132,11 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 			Key:                logOp.Key,
 			Value:              logOp.Value,
 			MachineID:          logOp.MachineId,
-			Offset:             process.Offset,
-			PrevMachineID:      parent.MachineID,
+			Offset:             progress.Offset,
+			PrevMachineID:      logOp.PrevMachineId,
 			Seq:                logOp.Seq,
 			CurrentLogGid:      logOp.Gid,
-			PrevLogGid:         parent.CurrentLogGid,
+			PrevLogGid:         logOp.PrevGid,
 			IsDeleted:          logOp.Op == int32(Op_Del),
 			IsDiscarded:        logOp.Op == int32(Op_Discard),
 			MachineChangeCount: logOp.Changes,
@@ -154,7 +155,7 @@ func (r *LogRunner) runLogInner(c *RunLogContext, process *LogProcess, logOp *Lo
 		Key:                logOp.Key,
 		Value:              logOp.Value,
 		MachineID:          logOp.MachineId,
-		Offset:             process.Offset,
+		Offset:             progress.Offset,
 		PrevMachineID:      logOp.PrevMachineId,
 		Seq:                logOp.Seq,
 		CurrentLogGid:      logOp.Gid,
@@ -180,7 +181,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 		if !r.runLogInner(c, worker.pendingOpProcess, worker.pendingOp) {
 			return false
 		}
-		worker.process = worker.pendingOpProcess
+		worker.progress = worker.pendingOpProcess
 		worker.pendingOp = nil
 		worker.pendingOpProcess = nil
 		count++
@@ -188,7 +189,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 
 	for worker.it.Next() {
 		logOp := worker.it.LogOp()
-		currentProcess := LogProcess{
+		currentProcess := LogProgress{
 			Num:    logOp.Num,
 			Offset: worker.it.Offset(),
 			Gid:    logOp.Gid,
@@ -198,7 +199,7 @@ func (r *LogRunner) tryAdvance(c *RunLogContext, worker *RunLogWorker) bool {
 			worker.pendingOpProcess = &currentProcess
 			return count > 0
 		}
-		worker.process = &currentProcess
+		worker.progress = &currentProcess
 		count++
 	}
 	return count > 0
@@ -209,10 +210,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 		return nil, fmt.Errorf("empty input")
 	}
 	c := RunLogContext{}
-	err := c.Init(i...)
-	if err != nil {
-		return nil, err
-	}
+	c.Init(i...)
 
 	blockNum := 0
 	for {
@@ -231,7 +229,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 		}
 	}
 
-	result := RunLogResult{status: make(map[string]*LogProcess)}
+	result := RunLogResult{status: make(map[string]*LogProgress)}
 	for _, worker := range c.workers {
 		if worker.err != nil {
 			if result.err == nil {
@@ -239,7 +237,7 @@ func (r *LogRunner) Run(i ...*LogInput) (*RunLogResult, error) {
 			}
 			result.err.errs = append(result.err.errs, worker.err)
 		}
-		result.status[worker.input.machineID] = worker.process
+		result.status[worker.input.machineID] = worker.progress
 	}
 	return &result, nil
 }

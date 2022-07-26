@@ -17,7 +17,7 @@ func getDB(t assert.TestingT) *SqliteAdapter {
 		assert.Nil(t, err)
 	}
 	a := SqliteAdapter{}
-	err = a.Init(fileName, tableName)
+	err = a.Init(fileName)
 	assert.Nil(t, err)
 	return &a
 }

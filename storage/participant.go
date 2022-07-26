@@ -17,36 +17,42 @@ type ParticipantInfo struct {
 	network *NetworkInfo
 }
 
-func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo) error {
-	personalPath := getPersonalPath(wd, name)
-	walPath := getWalFilePath(personalPath)
-	dbPath := getDBFilePath(personalPath)
+func initParticipant(wd string, name string, network *NetworkInfo) (*ParticipantInfo, error) {
+	p := ParticipantInfo{}
+	p.Init(wd, name, network)
 
-	if !IsDir(personalPath) {
-		err := os.MkdirAll(personalPath, 0777)
+	if !IsDir(p.personalPath) {
+		err := os.MkdirAll(p.personalPath, 0777)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	if !IsFile(walPath) {
+	if !IsFile(p.walFile) {
 		w := Wal{}
-		err := w.Init(walPath, &BinLog{}, false)
+		err := w.Init(p.walFile, &BinLog{}, false)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = w.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
+
+	return &p, nil
+}
+
+func (p *ParticipantInfo) Init(wd string, name string, n *NetworkInfo) {
+	personalPath := getPersonalPath(wd, name)
+	walPath := getWalFilePath(personalPath)
+	dbPath := getDBFilePath(personalPath)
 
 	p.name = name
 	p.personalPath = personalPath
 	p.walFile = walPath
 	p.dbFile = dbPath
 	p.network = n
-	return nil
 }
 
 type NetworkInfo struct {
@@ -62,23 +68,20 @@ func (n *NetworkInfo) Init(wd string) error {
 	participants := map[string]*ParticipantInfo{}
 	for _, name := range all {
 		p := ParticipantInfo{}
-		_ = p.Init(wd, name, n)
+		p.Init(wd, name, n)
 		participants[name] = &p
 	}
 
 	n.wd = wd
 	n.participants = participants
-
 	return nil
 }
 
 func (n *NetworkInfo) Add(name string) *ParticipantInfo {
 	if _, ok := n.participants[name]; !ok {
 		p := ParticipantInfo{}
-		// TODO: handle error
-		_ = p.Init(n.wd, name, n)
+		p.Init(n.wd, name, n)
 		n.participants[name] = &p
-
 	}
 	return n.participants[name]
 }
@@ -120,13 +123,13 @@ func getDBFilePath(personalPath string) string {
 	return dbFile
 }
 
-type LogProcessMgr struct {
-	m map[string]*LogProcess
+type LogProgressMgr struct {
+	m map[string]*LogProgress
 }
 
-func (m *LogProcessMgr) Init(process ...*LogProcess) {
-	m.m = make(map[string]*LogProcess)
-	for _, p := range process {
+func (m *LogProgressMgr) Init(progress ...*LogProgress) {
+	m.m = make(map[string]*LogProgress)
+	for _, p := range progress {
 		if p == nil {
 			continue
 		}
@@ -134,92 +137,105 @@ func (m *LogProcessMgr) Init(process ...*LogProcess) {
 	}
 }
 
-func (m *LogProcessMgr) Get(machineID string) *LogProcess {
+func (m *LogProgressMgr) Get(machineID string) *LogProgress {
 	if p, ok := m.m[machineID]; ok {
 		return p
 	}
-	p := LogProcess{Offset: HeaderSize}
+	p := LogProgress{Offset: HeaderSize}
 	m.m[machineID] = &p
 	return &p
 }
 
-func (m *LogProcessMgr) Set(machineID string, process *LogProcess) {
-	m.m[machineID] = process
+func (m *LogProgressMgr) Set(machineID string, progress *LogProgress) {
+	m.m[machineID] = progress
 }
 
 // Participant ...
 type Participant struct {
 	network *NetworkInfo
-	m       *LogProcessMgr
+	m       *LogProgressMgr
 	me      *ParticipantInfo
 
-	w         *WalHelper
-	f         ReadOnlyNodeStorage
-	runner    *LogRunner
-	machineID string
+	w      *WalHelper
+	ns     ReadOnlyNodeStorage
+	runner *LogRunner
 
 	// TODO
 	lastSyncTime time.Time
 }
 
-func runLogInputs(network *NetworkInfo, m *LogProcessMgr) (inputs []*LogInput, retErr error) {
+func makeRunLogInputs(network *NetworkInfo, m *LogProgressMgr) (inputs []*LogInput, retErr error) {
 	inputs = []*LogInput{}
 	for _, p := range network.participants {
-		var process LogProcess = *m.Get(p.name)
+		var progress LogProgress = *m.Get(p.name)
 		w := Wal{}
 		err := w.Init(p.walFile, &BinLog{}, true)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
+		defer func(w *Wal, filename string) {
 			if retErr != nil {
 				err := w.Close()
 				if err != nil {
-					logger.Error("close wal file failed", err)
+					logger.Error("close wal file[%v] failed[%v]", filename, err)
 				}
 			}
-		}()
+		}(&w, p.walFile)
 
 		inputs = append(inputs, &LogInput{
 			machineID: p.name, w: &w,
-			process: &process})
+			progress: &progress})
 	}
 	return inputs, nil
 }
 
-func runLog(runner *LogRunner, network *NetworkInfo, m *LogProcessMgr) error {
+func closeRunLogInputs(inputs ...*LogInput) {
+	for _, input := range inputs {
+		if input == nil {
+			continue
+		}
+		var filename string
+		if input.w.f != nil {
+			filename = input.w.f.Path()
+		}
+		err := input.w.Close()
+		if err != nil {
+			logger.Error("close wal file[%v] failed[%v]", filename, err)
+		}
+	}
+}
 
-	inputs, err := runLogInputs(network, m)
+func runLog(runner *LogRunner, network *NetworkInfo, m *LogProgressMgr) error {
+	inputs, err := makeRunLogInputs(network, m)
 	if err != nil {
 		return err
 	}
-	// TODO inputs.Close
+	defer func(inputs []*LogInput) {
+		closeRunLogInputs(inputs...)
+	}(inputs)
 
 	results, err := runner.Run(inputs...)
 	if err != nil {
 		return err
 	}
-
-	for machineID, process := range results.status {
-		m.Set(machineID, process)
+	for machineID, progress := range results.status {
+		m.Set(machineID, progress)
 	}
-
 	return nil
 }
 
-func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*LogProcess, error) {
-
+func (p *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*LogProgress, error) {
 	ns := NodeStorageImpl{}
 	ns.Init()
 
 	sqlite := SqliteAdapter{}
-	err := sqlite.Init(dbFile, "")
+	err := sqlite.Init(dbFile)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer sqlite.Close()
 
-	offsets, err := sqlite.Processes()
+	processes, err := sqlite.Processes()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -229,32 +245,29 @@ func (s *Participant) newNodeStorageFromSqlite(dbFile string) (NodeStorage, []*L
 		return nil, nil, err
 	}
 
-	return &ns, offsets, nil
+	return &ns, processes, nil
 }
 
-func (s *Participant) runLogTillEnd() error {
-	if err := runLog(s.runner, s.network, s.m); err != nil {
+func (p *Participant) runLogTillEnd() error {
+	if err := runLog(p.runner, p.network, p.m); err != nil {
 		return err
 	}
-	offset, err := s.w.Offset()
+	offset, err := p.w.Offset()
 	if err != nil {
 		return err
 	}
-	if s.m.Get(s.machineID).Offset != offset {
-		return fmt.Errorf("log process is not yet end")
+	if p.m.Get(p.me.name).Offset != offset {
+		return fmt.Errorf("log progress is not yet end")
 	}
 	return nil
 }
 
-func (s *Participant) Init(wd string, machineID string) error {
-	if !path.IsAbs(wd) && !(len(wd) > 1 && wd[1] == ':') {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		wd = path.Join(cwd, wd)
+func (p *Participant) Init(wd string, machineID string) (err error) {
+	wd, err = ToAbs(wd)
+	if err != nil {
+		return err
 	}
-	wd = path.Clean(wd)
+
 	if !IsDir(wd) {
 		err := os.MkdirAll(wd, 0777)
 		if err != nil {
@@ -263,19 +276,22 @@ func (s *Participant) Init(wd string, machineID string) error {
 	}
 
 	network := NetworkInfo{}
-	err := network.Init(wd)
+	err = network.Init(wd)
 	if err != nil {
 		return err
 	}
 
+	_, err = initParticipant(wd, machineID, &network)
+	if err != nil {
+		return err
+	}
 	me := network.Add(machineID)
 
-	ns, offsets, err := s.newNodeStorageFromSqlite(me.dbFile)
+	ns, offsets, err := p.newNodeStorageFromSqlite(me.dbFile)
 	if err != nil {
 		return err
 	}
-
-	m := LogProcessMgr{}
+	m := LogProgressMgr{}
 	m.Init(offsets...)
 
 	runner := LogRunner{}
@@ -286,20 +302,24 @@ func (s *Participant) Init(wd string, machineID string) error {
 
 	w := WalHelper{}
 	w.Init(me.walFile, &BinLog{}, 1)
+	defer func() {
+		if err != nil {
+			w.Close()
+		}
+	}()
 
-	s.network = &network
-	s.m = &m
-	s.f = ns
-	s.machineID = machineID
-	s.w = &w
-	s.me = me
-	s.runner = &runner
+	p.network = &network
+	p.m = &m
+	p.ns = ns
+	p.w = &w
+	p.me = me
+	p.runner = &runner
 	return nil
 }
 
-func (s *Participant) persistToSqlite() error {
+func (p *Participant) persistToSqlite() error {
 	sqlite := SqliteAdapter{}
-	err := sqlite.Init(s.me.dbFile, "")
+	err := sqlite.Init(p.me.dbFile)
 	if err != nil {
 		return err
 	}
@@ -314,96 +334,82 @@ func (s *Participant) persistToSqlite() error {
 	if err != nil {
 		return err
 	}
-	m := LogProcessMgr{}
+	m := LogProgressMgr{}
 	m.Init(processes...)
 
 	runner := LogRunner{}
-	err = runner.Init(s.machineID, &sqlite)
+	err = runner.Init(p.me.name, &sqlite)
 	if err != nil {
 		return err
 	}
-	return runLog(&runner, s.network, &m)
+	return runLog(&runner, p.network, &m)
 }
 
-func (s *Participant) Close() {
+func (p *Participant) Close() {
+	if p.w != nil {
+		p.w.Close()
+		p.w = nil
+	}
 	logger.Info("persist to sqlite...")
-	err := s.persistToSqlite()
+	err := p.persistToSqlite()
 	if err != nil {
 		logger.Error("persist to sqlite failed[%v]", err)
 	}
 }
 
-func (s *Participant) WithCommitID(string) Storage {
-	return s
-}
-
-func (s *Participant) WithMachineID(string) Storage {
-	return s
-}
-
-func (s *Participant) Save(key string, value string) error {
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) Save(key string, value string) error {
+	if err := p.runLogTillEnd(); err != nil {
 		return err
 	}
 
-	leaves, err := s.f.GetByKey(key)
+	leaves, err := p.ns.GetByKey(key)
 	if err != nil {
 		return err
 	}
 	leaves = filterVisible(leaves)
 
 	if len(leaves) == 0 {
-		_, _, err := s.w.Append(&LogOperation{
+		_, _, err := p.w.Append(&LogOperation{
 			Op:            int32(Op_Modify),
 			Key:           key,
 			Value:         value,
-			Gid:           "",
 			PrevGid:       "",
 			PrevValue:     "",
 			Seq:           0,
-			MachineId:     s.machineID,
+			MachineId:     p.me.name,
 			PrevMachineId: "",
-			Changes:       map[string]int32{s.machineID: 1},
+			Changes:       map[string]int32{p.me.name: 1},
 			PrevNum:       0,
 		})
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	}
 
-	main := findMain(leaves, s.machineID)
+	main := findMain(leaves, p.me.name)
 	if main == nil {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	_, _, err = s.w.Append(&LogOperation{
+	_, _, err = p.w.Append(&LogOperation{
 		Op:            int32(Op_Modify),
 		Key:           key,
 		Value:         value,
-		Gid:           "",
 		PrevGid:       main.CurrentLogGid,
 		PrevValue:     main.Value,
 		Seq:           main.Seq + 1,
-		MachineId:     s.machineID,
+		MachineId:     p.me.name,
 		PrevMachineId: main.MachineID,
-		Changes:       main.AddChange(s.machineID, 1),
+		Changes:       main.AddChange(p.me.name, 1),
 		PrevNum:       main.Num,
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-func (s *Participant) Del(key string) error {
-
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) Del(key string) error {
+	if err := p.runLogTillEnd(); err != nil {
 		return err
 	}
 
-	leaves, err := s.f.GetByKey(key)
+	leaves, err := p.ns.GetByKey(key)
 	if err != nil {
 		return err
 	}
@@ -411,43 +417,45 @@ func (s *Participant) Del(key string) error {
 	if len(leaves) == 0 {
 		return nil
 	}
-	main := findMain(leaves, s.machineID)
+
+	main := findMain(leaves, p.me.name)
 	if main == nil {
 		return fmt.Errorf("cannot find main node")
 	}
 
-	_, _, err = s.w.Append(&LogOperation{
+	_, _, err = p.w.Append(&LogOperation{
 		Op:            int32(Op_Del),
 		Key:           key,
-		Gid:           "",
 		PrevGid:       main.CurrentLogGid,
 		PrevValue:     main.Value,
 		Seq:           main.Seq + 1,
-		MachineId:     s.machineID,
+		MachineId:     p.me.name,
 		PrevMachineId: main.MachineID,
-		Changes:       main.AddChange(s.machineID, 1),
+		Changes:       main.AddChange(p.me.name, 1),
 		PrevNum:       main.Num,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (s *Participant) Has(key string) (bool, error) {
-
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) Has(key string) (bool, error) {
+	if err := p.runLogTillEnd(); err != nil {
 		return false, err
 	}
 
-	leaves, err := s.f.GetByKey(key)
+	leaves, err := p.ns.GetByKey(key)
 	if err != nil {
 		return false, err
 	}
 	leaves = filterVisible(leaves)
+	if len(leaves) == 0 {
+		return false, nil
+	}
 
-	return findMain(leaves, s.machineID) != nil, nil
+	main := findMain(leaves, p.me.name)
+	if main == nil {
+		return false, fmt.Errorf("cannot find main node")
+	}
+	return true, nil
 }
 
 func filterVisible(a []*DBRecord) []*DBRecord {
@@ -460,13 +468,12 @@ func filterVisible(a []*DBRecord) []*DBRecord {
 	return results
 }
 
-func (s *Participant) Load(key string) (*Value, error) {
-
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) Load(key string) (*Value, error) {
+	if err := p.runLogTillEnd(); err != nil {
 		return nil, err
 	}
 
-	leaves, err := s.f.GetByKey(key)
+	leaves, err := p.ns.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -476,36 +483,36 @@ func (s *Participant) Load(key string) (*Value, error) {
 	}
 
 	v := Value{}
-	err = v.from(leaves, s.machineID)
+	err = v.from(leaves, p.me.name)
 	if err != nil {
 		return nil, err
 	}
 	return &v, nil
 }
 
-func (s *Participant) All() ([]*Value, error) {
-
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) All() ([]*Value, error) {
+	if err := p.runLogTillEnd(); err != nil {
 		return nil, err
 	}
 
-	leaves, err := s.f.AllNodes()
+	leaves, err := p.ns.AllNodes()
 	if err != nil {
 		return nil, err
+	}
+	leaves = filterVisible(leaves)
+	if len(leaves) == 0 {
+		return nil, nil
 	}
 
 	m := make(map[string][]*DBRecord)
 	for _, l := range leaves {
-		if l == nil || !l.Visible() {
-			continue
-		}
 		m[l.Key] = append(m[l.Key], l)
 	}
 
 	results := make([]*Value, 0)
 	for _, l := range m {
 		v := Value{}
-		err := v.from(l, s.machineID)
+		err := v.from(l, p.me.name)
 		if err != nil {
 			return nil, err
 		}
@@ -514,8 +521,8 @@ func (s *Participant) All() ([]*Value, error) {
 	return results, nil
 }
 
-func (s *Participant) discard(gid string) (*LogOperation, error) {
-	record, err := s.f.GetByGid(gid)
+func (p *Participant) makeDiscardOperation(gid string) (*LogOperation, error) {
+	record, err := p.ns.GetByGid(gid)
 	if err != nil {
 		return nil, err
 	}
@@ -526,16 +533,15 @@ func (s *Participant) discard(gid string) (*LogOperation, error) {
 		PrevGid:       record.CurrentLogGid,
 		PrevValue:     record.Value,
 		Seq:           record.Seq + 1,
-		MachineId:     s.machineID,
+		MachineId:     p.me.name,
 		PrevMachineId: record.MachineID,
-		Changes:       record.AddChange(s.machineID, 1),
+		Changes:       record.AddChange(p.me.name, 1),
 		PrevNum:       record.Num,
 	}, nil
 }
 
-func (s *Participant) Accept(v *Value, seq int) error {
-
-	if err := s.runLogTillEnd(); err != nil {
+func (p *Participant) Accept(v *Value, seq int) error {
+	if err := p.runLogTillEnd(); err != nil {
 		return err
 	}
 
@@ -552,7 +558,7 @@ func (s *Participant) Accept(v *Value, seq int) error {
 			continue
 		}
 		if version.seq != seq {
-			op, err := s.discard(version.gid)
+			op, err := p.makeDiscardOperation(version.gid)
 			if err != nil {
 				logger.Warn("discard version failed, seq[%v] gid[%v]", version.seq, version.gid)
 				return err
@@ -564,15 +570,16 @@ func (s *Participant) Accept(v *Value, seq int) error {
 		return nil
 	}
 
-	_, _, err := s.w.Append(operations...)
+	_, _, err := p.w.Append(operations...)
 	return err
 }
 
-func (s *Participant) AllConflicts() ([]*Value, error) {
-	all, err := s.All()
+func (p *Participant) AllConflicts() ([]*Value, error) {
+	all, err := p.All()
 	if err != nil {
 		return nil, err
 	}
+
 	results := []*Value{}
 	for _, v := range all {
 		if v == nil {

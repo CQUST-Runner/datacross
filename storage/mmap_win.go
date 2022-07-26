@@ -78,25 +78,22 @@ func (f *MmapFile) Close() {
 		err := syscall.UnmapViewOfFile(f.addr)
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			f.addr = 0
 		}
+		f.addr = 0
 	}
 	if f.obj != syscall.InvalidHandle {
 		err := syscall.CloseHandle(f.obj)
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			f.obj = syscall.InvalidHandle
 		}
+		f.obj = syscall.InvalidHandle
 	}
 	if f.h != syscall.InvalidHandle {
 		err := syscall.CloseHandle(f.h)
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			f.h = syscall.InvalidHandle
 		}
+		f.h = syscall.InvalidHandle
 	}
 }
 
